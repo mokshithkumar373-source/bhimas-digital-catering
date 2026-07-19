@@ -87,13 +87,35 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
 
   // Handoff logic for duplicating or loading offline drafts
   const [order, setOrder] = useState<OrderDraft>(() => {
+    return (
+      initialOrder ?? {
+        status: "Pending",
+        guest_count: 0,
+        plate_rate: 0,
+        advance: 0,
+        function_date: typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : "",
+        order_details: {},
+      }
+    );
+  });
+
+  const [items, setItems] = useState<OrderItem[]>(() => {
+    return padItems(initialItems ?? []);
+  });
+
+  // Client-side initialization after mount (SSR Safety)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const localStorageKey = `bhimas_order_draft_${orderId || "new"}`;
     const draft = localStorage.getItem(localStorageKey);
     if (draft) {
       try {
         const parsed = JSON.parse(draft);
+        if (parsed.order) setOrder(parsed.order);
+        if (parsed.items) setItems(padItems(parsed.items));
         toast.info("Restored unsaved local draft");
-        return parsed.order;
+        return;
       } catch (e) {
         // ignore
       }
@@ -104,48 +126,15 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       if (dup) {
         sessionStorage.removeItem("bhimas_duplicate_draft");
         try {
-          return JSON.parse(dup).order;
+          const parsed = JSON.parse(dup);
+          if (parsed.order) setOrder(parsed.order);
+          if (parsed.items) setItems(padItems(parsed.items));
         } catch (e) {
           // ignore
         }
       }
     }
-    return (
-      initialOrder ?? {
-        status: "Pending",
-        guest_count: 0,
-        plate_rate: 0,
-        advance: 0,
-        function_date: new Date().toISOString().slice(0, 10),
-        order_details: {},
-      }
-    );
-  });
-
-  const [items, setItems] = useState<OrderItem[]>(() => {
-    const localStorageKey = `bhimas_order_draft_${orderId || "new"}`;
-    const draft = localStorage.getItem(localStorageKey);
-    if (draft) {
-      try {
-        const parsed = JSON.parse(draft);
-        return padItems(parsed.items);
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    if (!orderId) {
-      const dup = sessionStorage.getItem("bhimas_duplicate_draft");
-      if (dup) {
-        try {
-          return padItems(JSON.parse(dup).items);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return padItems(initialItems ?? []);
-  });
+  }, [orderId]);
 
   // Synchronize item names and checklist when active language switches
   useEffect(() => {
@@ -369,44 +358,76 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
   const pdfFilename = `Bhimas_Order_${formattedOrderNum}`;
 
   const doPDFGenerate = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(generatePDF(sheetRef.current), {
-      loading: "Generating PDF...",
-      success: "PDF opened in new window",
-      error: "Failed to generate PDF",
-    });
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Generating PDF...");
+    try {
+      await generatePDF(sheetRef.current);
+      toast.success("PDF opened in new window", { id: tId });
+    } catch (e: any) {
+      console.error("PDF Generation Error (Preview):", e);
+      toast.error(`Failed to generate PDF preview: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doPDFDownload = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(downloadPDF(sheetRef.current, pdfFilename), {
-      loading: "Downloading PDF...",
-      success: "PDF downloaded successfully",
-      error: "Failed to download PDF",
-    });
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Downloading PDF...");
+    try {
+      await downloadPDF(sheetRef.current, pdfFilename);
+      toast.success("PDF downloaded successfully", { id: tId });
+    } catch (e: any) {
+      console.error("PDF Download Error:", e);
+      toast.error(`Failed to download PDF: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doPNGGenerate = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(generatePNG(sheetRef.current), {
-      loading: "Generating PNG...",
-      success: "PNG opened in new window",
-      error: "Failed to generate PNG",
-    });
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Generating PNG...");
+    try {
+      await generatePNG(sheetRef.current);
+      toast.success("PNG opened in new window", { id: tId });
+    } catch (e: any) {
+      console.error("PNG Generation Error (Preview):", e);
+      toast.error(`Failed to generate PNG preview: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doPNGDownload = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(downloadPNG(sheetRef.current, pdfFilename), {
-      loading: "Downloading PNG...",
-      success: "PNG downloaded successfully",
-      error: "Failed to download PNG",
-    });
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Downloading PNG...");
+    try {
+      await downloadPNG(sheetRef.current, pdfFilename);
+      toast.success("PNG downloaded successfully", { id: tId });
+    } catch (e: any) {
+      console.error("PNG Download Error:", e);
+      toast.error(`Failed to download PNG: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doPrint = async () => {
-    if (!sheetRef.current) return;
-    printNode(sheetRef.current);
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    try {
+      printNode(sheetRef.current);
+    } catch (e: any) {
+      console.error("Print Error:", e);
+      toast.error(`Print failed: ${e?.message || e}`);
+    }
   };
 
   const getWhatsAppText = () => {
@@ -414,46 +435,58 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
   };
 
   const doWhatsAppPDF = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(
-      whatsappPDF(
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Preparing PDF for WhatsApp...");
+    try {
+      await whatsappPDF(
         sheetRef.current,
         pdfFilename,
         getWhatsAppText(),
         order.customer_phone ?? undefined,
-      ),
-      {
-        loading: "Preparing PDF for WhatsApp...",
-        success: "WhatsApp shared link opened",
-        error: "Failed to share PDF",
-      },
-    );
+      );
+      toast.success("WhatsApp shared link opened", { id: tId });
+    } catch (e: any) {
+      console.error("WhatsApp PDF Share Error:", e);
+      toast.error(`Failed to share PDF: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doWhatsAppPNG = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(
-      whatsappPNG(
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Preparing PNG for WhatsApp...");
+    try {
+      await whatsappPNG(
         sheetRef.current,
         pdfFilename,
         getWhatsAppText(),
         order.customer_phone ?? undefined,
-      ),
-      {
-        loading: "Preparing PNG for WhatsApp...",
-        success: "WhatsApp shared link opened",
-        error: "Failed to share PNG",
-      },
-    );
+      );
+      toast.success("WhatsApp shared link opened", { id: tId });
+    } catch (e: any) {
+      console.error("WhatsApp PNG Share Error:", e);
+      toast.error(`Failed to share PNG: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doShare = async () => {
-    if (!sheetRef.current) return;
-    toast.promise(shareNode(sheetRef.current, pdfFilename, getWhatsAppText()), {
-      loading: "Opening native sharing sheet...",
-      success: "Sharing opened",
-      error: "Failed to share document",
-    });
+    if (!sheetRef.current) {
+      toast.error("Error: Order sheet HTML element not found");
+      return;
+    }
+    const tId = toast.loading("Opening native sharing sheet...");
+    try {
+      await shareNode(sheetRef.current, pdfFilename, getWhatsAppText());
+      toast.success("Sharing opened", { id: tId });
+    } catch (e: any) {
+      console.error("Native Share Error:", e);
+      toast.error(`Failed to share document: ${e?.message || e}`, { id: tId });
+    }
   };
 
   const doDuplicate = () => {
