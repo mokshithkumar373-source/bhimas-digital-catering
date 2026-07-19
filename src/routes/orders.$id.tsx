@@ -25,17 +25,9 @@ function OrderDetail() {
   if (error || !data) {
     return (
       <AppLayout>
-        <div className="py-20 text-center text-destructive">
-          Order not found.
-        </div>
+        <div className="py-20 text-center text-destructive">Order not found.</div>
       </AppLayout>
     );
   }
-  return (
-    <OrderEditor
-      orderId={id}
-      initialOrder={data.order}
-      initialItems={data.items}
-    />
-  );
+  return <OrderEditor orderId={id} initialOrder={data.order} initialItems={data.items} />;
 }

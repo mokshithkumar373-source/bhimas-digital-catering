@@ -11,15 +11,7 @@ interface Props {
   onChange: (items: OrderItem[]) => void;
 }
 
-const CATEGORIES = [
-  "Breakfast",
-  "Rice",
-  "Curries",
-  "Sweets",
-  "Snacks",
-  "Ice Cream",
-  "Drinks",
-];
+const CATEGORIES = ["Breakfast", "Rice", "Curries", "Sweets", "Snacks", "Ice Cream", "Drinks"];
 
 export function MenuPicker({ menu, items, onChange }: Props) {
   const [tab, setTab] = useState<string>(CATEGORIES[0]);
@@ -28,9 +20,7 @@ export function MenuPicker({ menu, items, onChange }: Props) {
   const filtered = useMemo(
     () =>
       menu.filter(
-        (m) =>
-          m.category === tab &&
-          (q ? m.name.toLowerCase().includes(q.toLowerCase()) : true),
+        (m) => m.category === tab && (q ? m.name.toLowerCase().includes(q.toLowerCase()) : true),
       ),
     [menu, tab, q],
   );
@@ -152,9 +142,7 @@ export function MenuPicker({ menu, items, onChange }: Props) {
                   >
                     <Minus className="h-3 w-3" />
                   </button>
-                  <span className="min-w-[16px] text-center font-bold">
-                    {it.quantity}
-                  </span>
+                  <span className="min-w-[16px] text-center font-bold">{it.quantity}</span>
                   <button
                     type="button"
                     onClick={() => setQty(idx, 1)}

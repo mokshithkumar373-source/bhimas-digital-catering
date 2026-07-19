@@ -7,11 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  fetchMenuItems,
-  fetchSettings,
-  type MenuItem,
-} from "@/lib/supabase-queries";
+import { fetchMenuItems, fetchSettings, type MenuItem } from "@/lib/supabase-queries";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
@@ -20,15 +16,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-const CATEGORIES = [
-  "Breakfast",
-  "Rice",
-  "Curries",
-  "Sweets",
-  "Snacks",
-  "Ice Cream",
-  "Drinks",
-];
+const CATEGORIES = ["Breakfast", "Rice", "Curries", "Sweets", "Snacks", "Ice Cream", "Drinks"];
 
 function SettingsPage() {
   const qc = useQueryClient();
@@ -93,10 +81,7 @@ function SettingsPage() {
 
   const deleteItem = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("menu_items")
-        .update({ active: false })
-        .eq("id", id);
+      const { error } = await supabase.from("menu_items").update({ active: false }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["menu"] }),
@@ -106,9 +91,7 @@ function SettingsPage() {
     <AppLayout>
       <div className="mb-5">
         <h1 className="text-2xl font-bold md:text-3xl">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Business details and menu management
-        </p>
+        <p className="text-sm text-muted-foreground">Business details and menu management</p>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -139,9 +122,7 @@ function SettingsPage() {
               <Textarea
                 rows={2}
                 value={form.address ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, address: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
               />
             </div>
             <TextField
@@ -191,9 +172,7 @@ function SettingsPage() {
                 </Label>
                 <Input
                   value={newItem.name}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, name: e.target.value })
-                  }
+                  onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                   placeholder="e.g. Pulao"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") addItem.mutate();
@@ -207,9 +186,7 @@ function SettingsPage() {
                 <select
                   className="rounded-md border bg-background px-3 py-2 text-sm"
                   value={newItem.category}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, category: e.target.value })
-                  }
+                  onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c}>{c}</option>
@@ -272,9 +249,7 @@ function TextField({
 }) {
   return (
     <div>
-      <Label className="mb-1.5 block text-xs font-semibold text-muted-foreground">
-        {label}
-      </Label>
+      <Label className="mb-1.5 block text-xs font-semibold text-muted-foreground">{label}</Label>
       <Input value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
     </div>
   );

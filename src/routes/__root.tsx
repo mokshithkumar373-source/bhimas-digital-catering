@@ -52,10 +52,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/"
-            className="rounded-lg border px-4 py-2 text-sm font-semibold"
-          >
+          <a href="/" className="rounded-lg border px-4 py-2 text-sm font-semibold">
             Home
           </a>
         </div>

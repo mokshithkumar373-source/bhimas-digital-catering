@@ -30,8 +30,7 @@ function ReportsPage() {
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startYear = new Date(now.getFullYear(), 0, 1);
 
-  const sum = (list: typeof orders) =>
-    list.reduce((s, o) => s + Number(o.total ?? 0), 0);
+  const sum = (list: typeof orders) => list.reduce((s, o) => s + Number(o.total ?? 0), 0);
 
   const inRange = (d: string | null, from: Date) => !!d && new Date(d) >= from;
 
@@ -47,9 +46,7 @@ function ReportsPage() {
     cur.qty += Number(it.quantity);
     itemCount.set(it.name, cur);
   });
-  const topItems = [...itemCount.entries()]
-    .sort((a, b) => b[1].qty - a[1].qty)
-    .slice(0, 10);
+  const topItems = [...itemCount.entries()].sort((a, b) => b[1].qty - a[1].qty).slice(0, 10);
   const topCurry = topItems.find(([, v]) => v.category === "Curries");
   const topSweet = topItems.find(([, v]) => v.category === "Sweets");
 
@@ -59,17 +56,13 @@ function ReportsPage() {
     const k = o.customer_name || "Unknown";
     custRev.set(k, (custRev.get(k) ?? 0) + Number(o.total ?? 0));
   });
-  const topCustomers = [...custRev.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
+  const topCustomers = [...custRev.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
 
   return (
     <AppLayout>
       <div className="mb-5">
         <h1 className="text-2xl font-bold md:text-3xl">Reports</h1>
-        <p className="text-sm text-muted-foreground">
-          Revenue and menu insights
-        </p>
+        <p className="text-sm text-muted-foreground">Revenue and menu insights</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -86,9 +79,7 @@ function ReportsPage() {
           </CardHeader>
           <CardContent>
             {topItems.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No data yet.
-              </p>
+              <p className="py-6 text-center text-sm text-muted-foreground">No data yet.</p>
             ) : (
               <ol className="space-y-2 text-sm">
                 {topItems.map(([name, v], i) => (
@@ -101,9 +92,7 @@ function ReportsPage() {
                         {i + 1}
                       </span>
                       {name}
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {v.category}
-                      </span>
+                      <span className="ml-2 text-xs text-muted-foreground">{v.category}</span>
                     </span>
                     <span className="font-bold">{v.qty}</span>
                   </li>
@@ -119,9 +108,7 @@ function ReportsPage() {
           </CardHeader>
           <CardContent>
             {topCustomers.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No data yet.
-              </p>
+              <p className="py-6 text-center text-sm text-muted-foreground">No data yet.</p>
             ) : (
               <ol className="space-y-2 text-sm">
                 {topCustomers.map(([name, rev], i) => (
@@ -135,9 +122,7 @@ function ReportsPage() {
                       </span>
                       {name}
                     </span>
-                    <span className="font-bold text-brand">
-                      {formatINR(rev)}
-                    </span>
+                    <span className="font-bold text-brand">{formatINR(rev)}</span>
                   </li>
                 ))}
               </ol>
@@ -153,9 +138,7 @@ function ReportsPage() {
             {topCurry ? (
               <div>
                 <div className="text-2xl font-bold">{topCurry[0]}</div>
-                <div className="text-sm text-muted-foreground">
-                  Ordered {topCurry[1].qty} times
-                </div>
+                <div className="text-sm text-muted-foreground">Ordered {topCurry[1].qty} times</div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No data yet.</p>
@@ -171,9 +154,7 @@ function ReportsPage() {
             {topSweet ? (
               <div>
                 <div className="text-2xl font-bold">{topSweet[0]}</div>
-                <div className="text-sm text-muted-foreground">
-                  Ordered {topSweet[1].qty} times
-                </div>
+                <div className="text-sm text-muted-foreground">Ordered {topSweet[1].qty} times</div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No data yet.</p>
@@ -188,12 +169,8 @@ function ReportsPage() {
 function SumCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="text-xs font-medium text-muted-foreground">
-        {label} Revenue
-      </div>
-      <div className="mt-1 text-xl font-bold md:text-2xl text-brand">
-        {value}
-      </div>
+      <div className="text-xs font-medium text-muted-foreground">{label} Revenue</div>
+      <div className="mt-1 text-xl font-bold md:text-2xl text-brand">{value}</div>
     </div>
   );
 }

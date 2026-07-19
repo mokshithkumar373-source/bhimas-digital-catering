@@ -33,18 +33,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Utensils className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-base font-bold leading-tight text-brand">
-              Bhimas Catering
-            </div>
+            <div className="text-base font-bold leading-tight text-brand">Bhimas Catering</div>
             <div className="text-xs text-muted-foreground">తణుకు</div>
           </div>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
           {nav.map((n) => {
             const active =
-              n.to === "/"
-                ? path === "/"
-                : path === n.to || path.startsWith(n.to + "/");
+              n.to === "/" ? path === "/" : path === n.to || path.startsWith(n.to + "/");
             const Icon = n.icon;
             return (
               <Link
@@ -90,9 +86,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           .filter((n) => n.to !== "/orders/new")
           .map((n) => {
             const active =
-              n.to === "/"
-                ? path === "/"
-                : path === n.to || path.startsWith(n.to + "/");
+              n.to === "/" ? path === "/" : path === n.to || path.startsWith(n.to + "/");
             const Icon = n.icon;
             return (
               <Link
@@ -111,9 +105,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </nav>
 
       <main className="md:pl-64">
-        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 md:px-8 md:pb-10 md:pt-6">
-          {children}
-        </div>
+        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 md:px-8 md:pb-10 md:pt-6">{children}</div>
       </main>
 
       <Toaster richColors position="top-right" />

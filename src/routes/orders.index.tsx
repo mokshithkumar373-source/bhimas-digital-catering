@@ -47,9 +47,7 @@ function OrdersList() {
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Orders</h1>
-          <p className="text-sm text-muted-foreground">
-            {orders.length} total orders
-          </p>
+          <p className="text-sm text-muted-foreground">{orders.length} total orders</p>
         </div>
         <Link
           to="/orders/new"
@@ -119,9 +117,7 @@ function OrdersList() {
               </div>
               <div className="col-span-3">
                 <div className="font-semibold">{o.customer_name || "—"}</div>
-                <div className="text-xs text-muted-foreground">
-                  {o.customer_phone}
-                </div>
+                <div className="text-xs text-muted-foreground">{o.customer_phone}</div>
               </div>
               <div className="col-span-2 text-muted-foreground md:text-foreground">
                 {o.function_name}
@@ -129,12 +125,8 @@ function OrdersList() {
               <div className="col-span-2 text-muted-foreground md:text-foreground">
                 {o.function_date}
               </div>
-              <div className="col-span-1 font-semibold">
-                {o.guest_count ?? 0}
-              </div>
-              <div className="col-span-2 text-right font-bold text-brand">
-                {formatINR(o.total)}
-              </div>
+              <div className="col-span-1 font-semibold">{o.guest_count ?? 0}</div>
+              <div className="col-span-2 text-right font-bold text-brand">{formatINR(o.total)}</div>
               <div className="col-span-1 text-right">
                 <Badge
                   className={`${STATUS_COLORS[o.status] ?? "bg-muted"} border-0 font-semibold`}

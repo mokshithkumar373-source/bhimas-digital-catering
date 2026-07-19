@@ -82,11 +82,7 @@ export async function fetchMenuItems(): Promise<MenuItem[]> {
 }
 
 export async function fetchSettings(): Promise<BusinessSettings> {
-  const { data, error } = await supabase
-    .from("business_settings")
-    .select("*")
-    .eq("id", 1)
-    .single();
+  const { data, error } = await supabase.from("business_settings").select("*").eq("id", 1).single();
   if (error) throw error;
   return data as BusinessSettings;
 }
@@ -100,28 +96,18 @@ export async function fetchOrders(): Promise<Order[]> {
   return (data ?? []) as Order[];
 }
 
-export async function fetchOrder(
-  id: string,
-): Promise<{ order: Order; items: OrderItem[] }> {
-  const [{ data: order, error: e1 }, { data: items, error: e2 }] =
-    await Promise.all([
-      supabase.from("orders").select("*").eq("id", id).single(),
-      supabase
-        .from("order_items")
-        .select("*")
-        .eq("order_id", id)
-        .order("sort_order"),
-    ]);
+export async function fetchOrder(id: string): Promise<{ order: Order; items: OrderItem[] }> {
+  const [{ data: order, error: e1 }, { data: items, error: e2 }] = await Promise.all([
+    supabase.from("orders").select("*").eq("id", id).single(),
+    supabase.from("order_items").select("*").eq("order_id", id).order("sort_order"),
+  ]);
   if (e1) throw e1;
   if (e2) throw e2;
   return { order: order as Order, items: (items ?? []) as OrderItem[] };
 }
 
 export async function fetchCustomers() {
-  const { data, error } = await supabase
-    .from("customers")
-    .select("*")
-    .order("name");
+  const { data, error } = await supabase.from("customers").select("*").order("name");
   if (error) throw error;
   return data ?? [];
 }

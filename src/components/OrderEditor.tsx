@@ -1,45 +1,37 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import { AppLayout } from "@/components/AppLayout";
 import { OrderSheet } from "@/components/OrderSheet";
-import { MenuPicker } from "@/components/MenuPicker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  fetchMenuItems,
-  fetchSettings,
-  type Order,
-  type OrderItem,
-} from "@/lib/supabase-queries";
-import { calcTotals, formatINR } from "@/lib/order-utils";
+import { fetchMenuItems, fetchSettings, type Order, type OrderItem } from "@/lib/supabase-queries";
+import { formatINR } from "@/lib/order-utils";
+import { translateItem, translateChecklistItem } from "@/lib/translations";
 import {
   downloadPDF,
   downloadPNG,
+  generatePDF,
+  generatePNG,
   printNode,
-  shareOrPngWhatsApp,
+  whatsappPDF,
+  whatsappPNG,
+  shareNode,
 } from "@/lib/export-utils";
 import {
   Save,
   Eye,
   FileDown,
-  Image as ImageIcon,
+  ImageIcon,
   Printer,
   Share2,
   MessageCircle,
+  Copy,
+  Trash,
+  Info,
+  Languages,
 } from "lucide-react";
 
 type OrderDraft = Partial<Order>;
@@ -50,24 +42,39 @@ export interface OrderEditorProps {
   orderId?: string;
 }
 
-const STATUSES = [
-  "Pending",
-  "Preparing",
-  "Ready",
-  "Delivered",
-  "Completed",
-  "Cancelled",
-];
+const STATUSES = ["Pending", "Preparing", "Ready", "Delivered", "Completed", "Cancelled"];
 
-export function OrderEditor({
-  initialOrder,
-  initialItems,
-  orderId,
-}: OrderEditorProps) {
+const MIN_ROWS: Record<string, number> = {
+  Sweets: 7,
+  Curries: 7,
+  Rice: 7,
+  Snacks: 7,
+};
+
+function padItems(loadedItems: OrderItem[]) {
+  const padded = [...loadedItems];
+  Object.entries(MIN_ROWS).forEach(([cat, min]) => {
+    const existing = padded.filter((i) => i.category === cat);
+    const needed = min - existing.length;
+    for (let i = 0; i < needed; i++) {
+      padded.push({
+        name: "",
+        category: cat,
+        quantity: 1,
+        sort_order: existing.length + i,
+      });
+    }
+  });
+  return padded;
+}
+
+export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditorProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const sheetRef = useRef<HTMLDivElement>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [lang, setLang] = useState<"te" | "en">("te"); // Telugu as default language
 
   const { data: menu = [] } = useQuery({
     queryKey: ["menu"],
@@ -78,23 +85,160 @@ export function OrderEditor({
     queryFn: fetchSettings,
   });
 
-  const [order, setOrder] = useState<OrderDraft>(
-    initialOrder ?? {
-      status: "Pending",
-      guest_count: 0,
-      plate_rate: 0,
-      advance: 0,
-      function_date: new Date().toISOString().slice(0, 10),
-    },
+  // Handoff logic for duplicating or loading offline drafts
+  const [order, setOrder] = useState<OrderDraft>(() => {
+    const localStorageKey = `bhimas_order_draft_${orderId || "new"}`;
+    const draft = localStorage.getItem(localStorageKey);
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft);
+        toast.info("Restored unsaved local draft");
+        return parsed.order;
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (!orderId) {
+      const dup = sessionStorage.getItem("bhimas_duplicate_draft");
+      if (dup) {
+        sessionStorage.removeItem("bhimas_duplicate_draft");
+        try {
+          return JSON.parse(dup).order;
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return (
+      initialOrder ?? {
+        status: "Pending",
+        guest_count: 0,
+        plate_rate: 0,
+        advance: 0,
+        function_date: new Date().toISOString().slice(0, 10),
+        order_details: {},
+      }
+    );
+  });
+
+  const [items, setItems] = useState<OrderItem[]>(() => {
+    const localStorageKey = `bhimas_order_draft_${orderId || "new"}`;
+    const draft = localStorage.getItem(localStorageKey);
+    if (draft) {
+      try {
+        const parsed = JSON.parse(draft);
+        return padItems(parsed.items);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (!orderId) {
+      const dup = sessionStorage.getItem("bhimas_duplicate_draft");
+      if (dup) {
+        try {
+          return padItems(JSON.parse(dup).items);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    return padItems(initialItems ?? []);
+  });
+
+  // Synchronize item names and checklist when active language switches
+  useEffect(() => {
+    setItems((prevItems) =>
+      prevItems.map((it) => {
+        if (!it.name) return it;
+        const translated = translateItem(it.name, lang);
+        return { ...it, name: translated };
+      }),
+    );
+
+    setOrder((prevOrder) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const details = (prevOrder.order_details as Record<string, any>) || {};
+      if (details.items_to_bring) {
+        const translatedToBring = details.items_to_bring
+          .split(",")
+          .map((it: string) => translateChecklistItem(it.trim(), lang))
+          .join(", ");
+        return {
+          ...prevOrder,
+          order_details: {
+            ...details,
+            items_to_bring: translatedToBring,
+          },
+        };
+      }
+      return prevOrder;
+    });
+  }, [lang]);
+
+  const orderDetails = useMemo(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    () => (order.order_details as Record<string, any>) || {},
+    [order.order_details],
   );
-  const [items, setItems] = useState<OrderItem[]>(initialItems ?? []);
 
-  const totals = useMemo(() => calcTotals(order), [order]);
+  // Instant pricing calculations matching Bhimas Catering printed formula (GST/Discount completely deleted)
+  const totals = useMemo(() => {
+    const guestCount = Number(order.guest_count ?? 0);
+    const breakfastMembers = Number(orderDetails.breakfast_members ?? guestCount);
+    const lunchMembers = Number(orderDetails.lunch_members ?? guestCount);
+    const dinnerMembers = Number(orderDetails.dinner_members ?? guestCount);
+    const tiffinMembers = Number(orderDetails.tiffin_members ?? 0);
 
-  function patch<K extends keyof OrderDraft>(key: K, value: OrderDraft[K]) {
+    const breakfastTotal = breakfastMembers * Number(order.breakfast_rate ?? 0);
+    const lunchTotal = lunchMembers * Number(order.lunch_rate ?? 0);
+    const dinnerTotal = dinnerMembers * Number(order.dinner_rate ?? 0);
+    const tiffinTotal = tiffinMembers * Number(order.tiffin_rate ?? 0);
+
+    const serversQty = Number(orderDetails.servers_qty ?? 0);
+    const serversRate = Number(order.servers_charge ?? 0);
+    const serversTotal = serversQty * serversRate;
+
+    const transportTotal = Number(order.transport_charge ?? 0);
+    const grandTotal =
+      breakfastTotal + lunchTotal + dinnerTotal + tiffinTotal + serversTotal + transportTotal;
+
+    const advance = Number(order.advance ?? 0);
+    const balance = grandTotal - advance;
+
+    return { total: grandTotal, balance };
+  }, [order, orderDetails]);
+
+  // Set page dirty when fields or items change
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const patch = (key: keyof Order, value: any) => {
     setOrder((o) => ({ ...o, [key]: value }));
-  }
+    setIsDirty(true);
+  };
 
+  const handleUpdateItems = (newItems: OrderItem[]) => {
+    setItems(newItems);
+    setIsDirty(true);
+  };
+
+  // Autosave Draft every 30 seconds (Offline local storage caching)
+  useEffect(() => {
+    if (!isDirty) return;
+    const interval = setInterval(() => {
+      const localStorageKey = `bhimas_order_draft_${orderId || "new"}`;
+      localStorage.setItem(
+        localStorageKey,
+        JSON.stringify({ order, items: items.filter((i) => i.name.trim() !== "") }),
+      );
+      setIsDirty(false);
+      toast.success("Draft autosaved offline", { duration: 1500 });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [order, items, isDirty, orderId]);
+
+  // Save mutation to Supabase (GST/Discount set to 0 to preserve schema integrity)
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -112,16 +256,17 @@ export function OrderEditor({
         tiffin_rate: Number(order.tiffin_rate ?? 0),
         servers_charge: Number(order.servers_charge ?? 0),
         transport_charge: Number(order.transport_charge ?? 0),
-        gst: Number(order.gst ?? 0),
-        discount: Number(order.discount ?? 0),
+        gst: 0,
+        discount: 0,
         total: totals.total,
         advance: Number(order.advance ?? 0),
         balance: totals.balance,
         remarks: order.remarks ?? null,
         status: order.status ?? "Pending",
+        order_details: orderDetails,
       };
 
-      // Upsert customer by phone if provided
+      // Upsert customer
       let customerId: string | null = order.customer_id ?? null;
       if (payload.customer_phone) {
         const { data: existing } = await supabase
@@ -170,8 +315,10 @@ export function OrderEditor({
         savedId = data.id;
       }
 
-      if (items.length > 0 && savedId) {
-        const rows = items.map((it, idx) => ({
+      // Filter active items (remove empty rows)
+      const activeItems = items.filter((it) => it.name.trim() !== "");
+      if (activeItems.length > 0 && savedId) {
+        const rows = activeItems.map((it, idx) => ({
           order_id: savedId!,
           menu_item_id: it.menu_item_id ?? null,
           name: it.name,
@@ -184,13 +331,19 @@ export function OrderEditor({
         if (error) throw error;
       }
 
+      // Clear local storage draft upon successful save
+      localStorage.removeItem(`bhimas_order_draft_${orderId || "new"}`);
+      setIsDirty(false);
+
       return savedId!;
     },
     onSuccess: (id) => {
-      toast.success("Order saved");
+      toast.success("Order saved successfully");
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order", id] });
-      if (!orderId) navigate({ to: "/orders/$id", params: { id } });
+      if (!orderId) {
+        navigate({ to: "/orders/$id", params: { id } });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -202,48 +355,122 @@ export function OrderEditor({
       if (error) throw error;
     },
     onSuccess: () => {
+      localStorage.removeItem(`bhimas_order_draft_${orderId}`);
       toast.success("Order deleted");
       qc.invalidateQueries({ queryKey: ["orders"] });
       navigate({ to: "/orders" });
     },
   });
 
-  const duplicate = () => {
-    navigate({ to: "/orders/new" });
-    // Note: duplicating cross-route is complex; instead we simply clear the id on the current draft
-    // by using sessionStorage for a proper handoff would be ideal, but a fresh new-order page works.
-  };
+  // Padded Order Number for Filename: Bhimas_Order_####.pdf
+  const formattedOrderNum = order.order_number
+    ? String(order.order_number).padStart(4, "0")
+    : "Draft";
+  const pdfFilename = `Bhimas_Order_${formattedOrderNum}`;
 
-  const filename = `Bhimas-Order-${order.customer_name?.replace(/\s+/g, "_") || "New"}-${order.function_date || ""}`;
-
-  const doPDF = async () => {
+  const doPDFGenerate = async () => {
     if (!sheetRef.current) return;
-    await ensureVisible(setShowPreview);
-    toast.promise(downloadPDF(sheetRef.current, filename), {
+    toast.promise(generatePDF(sheetRef.current), {
       loading: "Generating PDF...",
-      success: "PDF downloaded",
+      success: "PDF opened in new window",
       error: "Failed to generate PDF",
     });
   };
-  const doPNG = async () => {
+
+  const doPDFDownload = async () => {
     if (!sheetRef.current) return;
-    await ensureVisible(setShowPreview);
-    toast.promise(downloadPNG(sheetRef.current, filename), {
+    toast.promise(downloadPDF(sheetRef.current, pdfFilename), {
+      loading: "Downloading PDF...",
+      success: "PDF downloaded successfully",
+      error: "Failed to download PDF",
+    });
+  };
+
+  const doPNGGenerate = async () => {
+    if (!sheetRef.current) return;
+    toast.promise(generatePNG(sheetRef.current), {
       loading: "Generating PNG...",
-      success: "PNG downloaded",
+      success: "PNG opened in new window",
       error: "Failed to generate PNG",
     });
   };
+
+  const doPNGDownload = async () => {
+    if (!sheetRef.current) return;
+    toast.promise(downloadPNG(sheetRef.current, pdfFilename), {
+      loading: "Downloading PNG...",
+      success: "PNG downloaded successfully",
+      error: "Failed to download PNG",
+    });
+  };
+
   const doPrint = async () => {
     if (!sheetRef.current) return;
-    await ensureVisible(setShowPreview);
     printNode(sheetRef.current);
   };
-  const doWhatsApp = async () => {
+
+  const getWhatsAppText = () => {
+    return `Bhimas Catering — Order details:\nOrder No: #${order.order_number || "Draft"}\nCustomer: ${order.customer_name || ""}\nFunction: ${order.function_name || ""}\nDate: ${order.function_date || ""}\nTotal Amount: ${formatINR(totals.total)}\nAdvance paid: ${formatINR(order.advance || 0)}\nBalance: ${formatINR(totals.balance)}`;
+  };
+
+  const doWhatsAppPDF = async () => {
     if (!sheetRef.current) return;
-    await ensureVisible(setShowPreview);
-    const text = `Bhimas Catering — Order for ${order.customer_name || ""}\nFunction: ${order.function_name || ""}\nDate: ${order.function_date || ""}\nPlates: ${order.guest_count || 0}\nTotal: ${formatINR(totals.total)}\nBalance: ${formatINR(totals.balance)}`;
-    await shareOrPngWhatsApp(sheetRef.current, text, order.customer_phone ?? undefined);
+    toast.promise(
+      whatsappPDF(
+        sheetRef.current,
+        pdfFilename,
+        getWhatsAppText(),
+        order.customer_phone ?? undefined,
+      ),
+      {
+        loading: "Preparing PDF for WhatsApp...",
+        success: "WhatsApp shared link opened",
+        error: "Failed to share PDF",
+      },
+    );
+  };
+
+  const doWhatsAppPNG = async () => {
+    if (!sheetRef.current) return;
+    toast.promise(
+      whatsappPNG(
+        sheetRef.current,
+        pdfFilename,
+        getWhatsAppText(),
+        order.customer_phone ?? undefined,
+      ),
+      {
+        loading: "Preparing PNG for WhatsApp...",
+        success: "WhatsApp shared link opened",
+        error: "Failed to share PNG",
+      },
+    );
+  };
+
+  const doShare = async () => {
+    if (!sheetRef.current) return;
+    toast.promise(shareNode(sheetRef.current, pdfFilename, getWhatsAppText()), {
+      loading: "Opening native sharing sheet...",
+      success: "Sharing opened",
+      error: "Failed to share document",
+    });
+  };
+
+  const doDuplicate = () => {
+    const duplicateDraft = {
+      order: {
+        ...order,
+        id: undefined,
+        order_number: undefined,
+        customer_name: order.customer_name ? `${order.customer_name} (Copy)` : "Copy",
+      },
+      items: items
+        .filter((it) => it.name.trim() !== "")
+        .map((it) => ({ ...it, id: undefined, order_id: undefined })),
+    };
+    sessionStorage.setItem("bhimas_duplicate_draft", JSON.stringify(duplicateDraft));
+    toast.success("Duplicated to a new unsaved draft");
+    navigate({ to: "/orders/new" });
   };
 
   if (!settings) {
@@ -256,357 +483,249 @@ export function OrderEditor({
 
   return (
     <AppLayout>
-      {/* Sticky action bar */}
-      <div className="sticky top-0 z-30 -mx-4 mb-5 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
+      {/* Top Fixed Toolbar */}
+      <div className="sticky top-0 z-30 -mx-4 mb-5 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8 no-print shadow-sm">
         <div className="mr-auto">
-          <h1 className="text-lg font-bold md:text-xl">
-            {orderId ? "Order" : "New Order"}
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
+          <h1 className="text-sm font-bold md:text-base flex items-center gap-1.5 text-green-800">
+            <span>{orderId ? `Order #${order.order_number || ""}` : "New Order Form"}</span>
+            <span className="text-xs font-semibold text-slate-500">
               Total {formatINR(totals.total)} · Balance {formatINR(totals.balance)}
             </span>
           </h1>
         </div>
-        <ActionBtn onClick={() => saveMutation.mutate()} primary disabled={saveMutation.isPending}>
-          <Save className="h-4 w-4" /> Save
-        </ActionBtn>
-        <ActionBtn onClick={() => setShowPreview((v) => !v)}>
-          <Eye className="h-4 w-4" /> {showPreview ? "Hide" : "Preview"}
-        </ActionBtn>
-        <ActionBtn onClick={doPDF}>
-          <FileDown className="h-4 w-4" /> PDF
-        </ActionBtn>
-        <ActionBtn onClick={doPNG}>
-          <ImageIcon className="h-4 w-4" /> PNG
-        </ActionBtn>
-        <ActionBtn onClick={doPrint}>
-          <Printer className="h-4 w-4" /> Print
-        </ActionBtn>
-        <ActionBtn onClick={doWhatsApp}>
-          <MessageCircle className="h-4 w-4" /> WhatsApp
-        </ActionBtn>
-        <ActionBtn onClick={doPDF}>
-          <Share2 className="h-4 w-4" /> Share
-        </ActionBtn>
-        {orderId && (
-          <>
-            <ActionBtn onClick={duplicate}>Duplicate</ActionBtn>
-            <ActionBtn
+        <div className="flex flex-wrap items-center gap-1">
+          {/* Language Switch Switcher */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setLang(lang === "te" ? "en" : "te")}
+            className="font-bold border-green-600 text-green-800 bg-green-50/50 hover:bg-green-50 px-3"
+          >
+            <Languages className="h-4 w-4 mr-1 text-green-600 animate-none" />{" "}
+            {lang === "te" ? "తెలుగు" : "English"}
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="bg-brand text-brand-foreground hover:opacity-90 font-bold px-3"
+          >
+            <Save className="h-4 w-4 mr-1" /> Save
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsPreviewMode(!isPreviewMode)}
+            className={`${isPreviewMode ? "bg-green-50 border-green-600 text-green-800" : ""} font-bold px-3`}
+          >
+            <Eye className="h-4 w-4 mr-1" /> {isPreviewMode ? "Edit Mode" : "Preview Mode"}
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doPDFGenerate} className="font-bold px-2.5">
+            <FileDown className="h-4 w-4 mr-1 text-green-700" /> Generate PDF
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doPDFDownload} className="font-bold px-2.5">
+            <FileDown className="h-4 w-4 mr-1 text-green-700" /> Download PDF
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doPNGGenerate} className="font-bold px-2.5">
+            <ImageIcon className="h-4 w-4 mr-1 text-green-700" /> Generate PNG
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doPNGDownload} className="font-bold px-2.5">
+            <ImageIcon className="h-4 w-4 mr-1 text-green-700" /> Download PNG
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doPrint} className="font-bold px-2.5">
+            <Printer className="h-4 w-4 mr-1" /> Print
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={doWhatsAppPDF}
+            className="font-bold px-2.5 text-green-800 border-green-200"
+          >
+            <MessageCircle className="h-4 w-4 mr-1 text-green-600" /> WhatsApp PDF
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={doWhatsAppPNG}
+            className="font-bold px-2.5 text-green-800 border-green-200"
+          >
+            <MessageCircle className="h-4 w-4 mr-1 text-green-600" /> WhatsApp PNG
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doShare} className="font-bold px-2.5">
+            <Share2 className="h-4 w-4 mr-1" /> Share
+          </Button>
+
+          <Button size="sm" variant="outline" onClick={doDuplicate} className="font-bold px-2.5">
+            <Copy className="h-4 w-4 mr-1" /> Duplicate
+          </Button>
+
+          {orderId && (
+            <Button
+              size="sm"
+              variant="destructive"
               onClick={() => {
                 if (confirm("Delete this order?")) deleteMutation.mutate();
               }}
-              destructive
+              disabled={deleteMutation.isPending}
+              className="font-bold px-2.5"
             >
-              Delete
-            </ActionBtn>
-          </>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Customer & Function</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="Customer Name">
-                <Input
-                  value={order.customer_name ?? ""}
-                  onChange={(e) => patch("customer_name", e.target.value)}
-                  placeholder="Sri ..."
-                />
-              </Field>
-              <Field label="Phone Number">
-                <Input
-                  value={order.customer_phone ?? ""}
-                  onChange={(e) => patch("customer_phone", e.target.value)}
-                  placeholder="10-digit"
-                  inputMode="tel"
-                />
-              </Field>
-              <Field label="Address" full>
-                <Textarea
-                  value={order.customer_address ?? ""}
-                  onChange={(e) => patch("customer_address", e.target.value)}
-                  rows={2}
-                />
-              </Field>
-              <Field label="Function Name">
-                <Input
-                  value={order.function_name ?? ""}
-                  onChange={(e) => patch("function_name", e.target.value)}
-                  placeholder="Wedding, Birthday..."
-                />
-              </Field>
-              <Field label="Function Date">
-                <Input
-                  type="date"
-                  value={order.function_date ?? ""}
-                  onChange={(e) => patch("function_date", e.target.value)}
-                />
-              </Field>
-              <Field label="Delivery Time">
-                <Input
-                  value={order.delivery_time ?? ""}
-                  onChange={(e) => patch("delivery_time", e.target.value)}
-                  placeholder="e.g. 12:30 PM"
-                />
-              </Field>
-              <Field label="Status">
-                <Select
-                  value={order.status ?? "Pending"}
-                  onValueChange={(v) => patch("status", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Remarks" full>
-                <Textarea
-                  value={order.remarks ?? ""}
-                  onChange={(e) => patch("remarks", e.target.value)}
-                  rows={2}
-                />
-              </Field>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Menu Selection</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <MenuPicker menu={menu} items={items} onChange={setItems} />
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Pricing</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              <Field label="Guest / Plates">
-                <Input
-                  type="number"
-                  value={order.guest_count ?? 0}
-                  onChange={(e) =>
-                    patch("guest_count", Number(e.target.value))
-                  }
-                />
-              </Field>
-              <Field label="Plate Rate ₹">
-                <Input
-                  type="number"
-                  value={order.plate_rate ?? 0}
-                  onChange={(e) => patch("plate_rate", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Breakfast ₹">
-                <Input
-                  type="number"
-                  value={order.breakfast_rate ?? 0}
-                  onChange={(e) =>
-                    patch("breakfast_rate", Number(e.target.value))
-                  }
-                />
-              </Field>
-              <Field label="Lunch ₹">
-                <Input
-                  type="number"
-                  value={order.lunch_rate ?? 0}
-                  onChange={(e) => patch("lunch_rate", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Dinner ₹">
-                <Input
-                  type="number"
-                  value={order.dinner_rate ?? 0}
-                  onChange={(e) => patch("dinner_rate", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Tiffin ₹">
-                <Input
-                  type="number"
-                  value={order.tiffin_rate ?? 0}
-                  onChange={(e) => patch("tiffin_rate", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Servers ₹">
-                <Input
-                  type="number"
-                  value={order.servers_charge ?? 0}
-                  onChange={(e) =>
-                    patch("servers_charge", Number(e.target.value))
-                  }
-                />
-              </Field>
-              <Field label="Transport ₹">
-                <Input
-                  type="number"
-                  value={order.transport_charge ?? 0}
-                  onChange={(e) =>
-                    patch("transport_charge", Number(e.target.value))
-                  }
-                />
-              </Field>
-              <Field label="GST ₹">
-                <Input
-                  type="number"
-                  value={order.gst ?? 0}
-                  onChange={(e) => patch("gst", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Discount ₹">
-                <Input
-                  type="number"
-                  value={order.discount ?? 0}
-                  onChange={(e) => patch("discount", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Advance ₹" full>
-                <Input
-                  type="number"
-                  value={order.advance ?? 0}
-                  onChange={(e) => patch("advance", Number(e.target.value))}
-                />
-              </Field>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-brand-soft/50">
-            <CardContent className="space-y-2 py-4 text-sm">
-              <Row label="Plates × Rate">
-                {order.guest_count ?? 0} × {formatINR(order.plate_rate)} ={" "}
-                {formatINR(totals.plateAmount)}
-              </Row>
-              <Row label="Total">
-                <span className="font-bold text-brand text-lg">
-                  {formatINR(totals.total)}
-                </span>
-              </Row>
-              <Row label="Advance">{formatINR(order.advance)}</Row>
-              <Row label="Balance">
-                <span className="font-bold text-lg">
-                  {formatINR(totals.balance)}
-                </span>
-              </Row>
-            </CardContent>
-          </Card>
+              <Trash className="h-4 w-4 mr-1" /> Delete
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Sheet preview / render area (always mounted so refs work) */}
-      <div
-        className={`mt-6 ${showPreview ? "block" : "hidden"}`}
-      >
-        <div className="mb-2 text-sm font-semibold text-muted-foreground">
-          Order Sheet Preview (A4)
+      {/* Admin Metadata Section (Screen Only) */}
+      <div className="no-print bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 text-[11px] shadow-sm">
+        <div className="font-bold text-slate-700 mb-3 flex items-center justify-between border-b pb-1.5">
+          <span className="flex items-center gap-1.5 text-slate-700">
+            <Info className="h-4 w-4 text-green-600" />
+            Admin Data Section (Screen Only - Will NOT print on PDF)
+          </span>
+          {isDirty && (
+            <span className="text-amber-600 font-bold animate-pulse">
+              You have unsaved changes (autosaving every 30s)
+            </span>
+          )}
         </div>
-        <div className="overflow-auto rounded-2xl border bg-muted/30 p-4">
-          <div style={{ transform: "scale(0.9)", transformOrigin: "top left" }}>
-            <OrderSheet
-              ref={sheetRef}
-              order={order}
-              items={items}
-              settings={settings}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+          {/* Function Date */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Function Date
+            </label>
+            <input
+              type="date"
+              value={order.function_date || ""}
+              onChange={(e) => patch("function_date", e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-semibold"
+            />
+          </div>
+          {/* Order Number */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Order Number
+            </label>
+            <input
+              type="text"
+              readOnly
+              value={order.order_number ? `#${order.order_number}` : "Draft (Auto)"}
+              className="w-full bg-slate-100 border border-slate-200 rounded p-1.5 outline-none text-slate-500 font-bold"
+            />
+          </div>
+          {/* Order Status */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Order Status
+            </label>
+            <select
+              value={order.status || "Pending"}
+              onChange={(e) => patch("status", e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-bold h-[31px]"
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* Customer Phone */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Customer Phone
+            </label>
+            <input
+              type="text"
+              value={order.customer_phone || ""}
+              onChange={(e) => patch("customer_phone", e.target.value)}
+              placeholder="Phone number"
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-semibold"
+            />
+          </div>
+          {/* Total Plates (Guest Count) */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Guest Count
+            </label>
+            <input
+              type="number"
+              value={order.guest_count || 0}
+              onChange={(e) => patch("guest_count", Number(e.target.value))}
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-bold"
+            />
+          </div>
+          {/* Rate Per Plate */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Plate Rate
+            </label>
+            <input
+              type="number"
+              value={order.plate_rate || 0}
+              onChange={(e) => patch("plate_rate", Number(e.target.value))}
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-bold"
+            />
+          </div>
+          {/* Created By */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Created By
+            </label>
+            <input
+              type="text"
+              value={orderDetails.created_by || ""}
+              onChange={(e) =>
+                patch("order_details", { ...orderDetails, created_by: e.target.value })
+              }
+              placeholder="Staff operator"
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-semibold"
+            />
+          </div>
+          {/* Internal Notes */}
+          <div>
+            <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">
+              Internal Notes
+            </label>
+            <input
+              type="text"
+              value={orderDetails.internal_notes || ""}
+              onChange={(e) =>
+                patch("order_details", { ...orderDetails, internal_notes: e.target.value })
+              }
+              placeholder="Private instructions"
+              className="w-full bg-white border border-slate-300 rounded p-1.5 outline-none focus:border-green-600 text-[#000] font-semibold"
             />
           </div>
         </div>
       </div>
-      {/* Off-screen render so export works even when preview is hidden */}
-      {!showPreview && (
-        <div
-          style={{
-            position: "absolute",
-            left: -99999,
-            top: 0,
-            pointerEvents: "none",
-          }}
-          aria-hidden
-        >
+
+      {/* Center Layout for A4 Paper Viewport */}
+      <div className="w-full overflow-x-auto pb-8 flex justify-center bg-slate-100 p-2 md:p-6 rounded-2xl border">
+        <div className="shadow-2xl bg-white border rounded">
           <OrderSheet
             ref={sheetRef}
             order={order}
             items={items}
             settings={settings}
+            menu={menu}
+            isPreviewMode={isPreviewMode}
+            lang={lang}
+            onChangeOrder={patch}
+            onChangeItems={handleUpdateItems}
           />
         </div>
-      )}
+      </div>
     </AppLayout>
-  );
-}
-
-async function ensureVisible(_setter: (v: boolean) => void) {
-  // Sheet is always rendered (either visibly or off-screen); no-op.
-  await Promise.resolve();
-}
-
-function Field({
-  label,
-  children,
-  full,
-}: {
-  label: string;
-  children: React.ReactNode;
-  full?: boolean;
-}) {
-  return (
-    <div className={full ? "md:col-span-2 col-span-2" : ""}>
-      <Label className="mb-1.5 block text-xs font-semibold text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span>{children}</span>
-    </div>
-  );
-}
-
-function ActionBtn({
-  children,
-  onClick,
-  primary,
-  destructive,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  primary?: boolean;
-  destructive?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={
-        primary
-          ? "bg-brand text-brand-foreground hover:opacity-90"
-          : destructive
-            ? "bg-destructive text-destructive-foreground hover:opacity-90"
-            : "bg-secondary text-secondary-foreground hover:bg-brand-soft"
-      }
-      size="sm"
-    >
-      {children}
-    </Button>
   );
 }
