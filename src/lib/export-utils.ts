@@ -1,31 +1,33 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-const OKLCH_MAP: Record<string, string> = {
-  "--background": "#fcfdfc",
-  "--foreground": "#2e3532",
-  "--card": "#ffffff",
-  "--card-foreground": "#2e3532",
-  "--popover": "#ffffff",
-  "--popover-foreground": "#2e3532",
-  "--primary": "#0a7a3f",
-  "--primary-foreground": "#fcfdfc",
-  "--secondary": "#edf2ef",
-  "--secondary-foreground": "#0e5c32",
-  "--muted": "#f1f4f2",
-  "--muted-foreground": "#73827c",
-  "--accent": "#e5f0e9",
-  "--accent-foreground": "#0e5c32",
-  "--destructive": "#e53e3e",
-  "--destructive-foreground": "#ffffff",
-  "--border": "#e1e7e3",
-  "--input": "#e1e7e3",
-  "--ring": "#0a7a3f",
-  "--brand": "#0a7a3f",
-  "--brand-foreground": "#fcfdfc",
-  "--brand-soft": "#eef7f2",
-  "--sheet-border": "#0a7a3f",
-};
+let tempEl: HTMLDivElement | null = null;
+
+function convertColorToRgb(colorStr: string, originalGetComputedStyle: typeof window.getComputedStyle): string {
+  if (typeof document === "undefined") return colorStr;
+  if (!tempEl) {
+    tempEl = document.createElement("div");
+    tempEl.style.display = "none";
+    document.body.appendChild(tempEl);
+  }
+  tempEl.style.color = colorStr;
+  const computed = originalGetComputedStyle(tempEl).color;
+  return computed || colorStr;
+}
+
+function sanitizeStyleValue(val: string, originalGetComputedStyle: typeof window.getComputedStyle): string {
+  if (typeof val !== "string") return val;
+  if (!val.includes("oklch") && !val.includes("oklab")) return val;
+
+  return val.replace(/(oklch|oklab)\([^)]+\)/g, (match) => {
+    try {
+      return convertColorToRgb(match, originalGetComputedStyle);
+    } catch (e) {
+      console.warn("Failed to convert color value:", match, e);
+      return "rgba(0,0,0,0)";
+    }
+  });
+}
 
 export async function nodeToCanvas(node: HTMLElement) {
   if (typeof document !== "undefined" && document.fonts) {
@@ -36,14 +38,24 @@ export async function nodeToCanvas(node: HTMLElement) {
     }
   }
 
-  // Override oklch variables temporarily to prevent html2canvas parsing crashes
-  const originalStyles: Record<string, string> = {};
-  const rootStyle = document.documentElement.style;
+  // Intercept getComputedStyle to resolve oklch/oklab dynamically using browser engine
+  const originalGetComputedStyle = window.getComputedStyle;
   
-  Object.keys(OKLCH_MAP).forEach((key) => {
-    originalStyles[key] = rootStyle.getPropertyValue(key);
-    rootStyle.setProperty(key, OKLCH_MAP[key]);
-  });
+  window.getComputedStyle = function (el, pseudoElt) {
+    const style = originalGetComputedStyle(el, pseudoElt);
+    return new Proxy(style, {
+      get(target, prop, receiver) {
+        if (prop === "getPropertyValue") {
+          return function (name: string) {
+            const val = target.getPropertyValue(name);
+            return sanitizeStyleValue(val, originalGetComputedStyle);
+          };
+        }
+        const val = Reflect.get(target, prop, receiver);
+        return typeof val === "string" ? sanitizeStyleValue(val, originalGetComputedStyle) : val;
+      }
+    });
+  };
 
   try {
     return await html2canvas(node, {
@@ -53,15 +65,12 @@ export async function nodeToCanvas(node: HTMLElement) {
       logging: false,
     });
   } finally {
-    // Restore original styles
-    Object.keys(OKLCH_MAP).forEach((key) => {
-      const orig = originalStyles[key];
-      if (orig) {
-        rootStyle.setProperty(key, orig);
-      } else {
-        rootStyle.removeProperty(key);
-      }
-    });
+    // Restore original window helper and cleanup temp element
+    window.getComputedStyle = originalGetComputedStyle;
+    if (tempEl) {
+      tempEl.remove();
+      tempEl = null;
+    }
   }
 }
 
