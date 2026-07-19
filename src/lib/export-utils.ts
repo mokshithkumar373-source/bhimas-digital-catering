@@ -2,6 +2,9 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 export async function nodeToCanvas(node: HTMLElement) {
+  if (typeof document !== "undefined" && document.fonts) {
+    await document.fonts.ready;
+  }
   return await html2canvas(node, {
     scale: 3,
     backgroundColor: "#ffffff",
@@ -20,12 +23,18 @@ export async function downloadPNG(node: HTMLElement, filename: string) {
   a.click();
 }
 
-// Generate PNG and open in a new tab
+// Generate PNG and open in a new tab (Bypass popup blocker)
 export async function generatePNG(node: HTMLElement) {
-  const canvas = await nodeToCanvas(node);
-  const url = canvas.toDataURL("image/png");
-  const w = window.open();
-  if (w) {
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Popup blocker enabled! Please allow popups for this site.");
+    return;
+  }
+  w.document.write("Loading PNG preview...");
+  try {
+    const canvas = await nodeToCanvas(node);
+    const url = canvas.toDataURL("image/png");
+    w.document.body.innerHTML = "";
     w.document.write(`
       <html>
         <head><title>Bhimas Order PNG</title></head>
@@ -35,6 +44,9 @@ export async function generatePNG(node: HTMLElement) {
       </html>
     `);
     w.document.close();
+  } catch (e) {
+    w.close();
+    throw e;
   }
 }
 
@@ -64,11 +76,22 @@ export async function downloadPDF(node: HTMLElement, filename: string) {
   return pdf;
 }
 
-// Generate PDF and open in a new tab
+// Generate PDF and open in a new tab (Bypass popup blocker)
 export async function generatePDF(node: HTMLElement) {
-  const pdf = await buildPDF(node);
-  const blobUrl = pdf.output("bloburl");
-  window.open(blobUrl, "_blank");
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Popup blocker enabled! Please allow popups for this site.");
+    return;
+  }
+  w.document.write("Loading PDF preview...");
+  try {
+    const pdf = await buildPDF(node);
+    const blobUrl = pdf.output("bloburl");
+    w.location.href = blobUrl;
+  } catch (e) {
+    w.close();
+    throw e;
+  }
 }
 
 export async function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -103,7 +126,10 @@ export async function whatsappPDF(
 
   // Fallback: download PDF and open WhatsApp web
   pdf.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
-  const cleanPhone = (phone ?? "").replace(/\D/g, "");
+  let cleanPhone = (phone ?? "").replace(/\D/g, "");
+  if (cleanPhone.length === 10) {
+    cleanPhone = "91" + cleanPhone;
+  }
   const waUrl = cleanPhone
     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text + "\n\n(PDF downloaded - please attach from your device)")}`
     : `https://wa.me/?text=${encodeURIComponent(text + "\n\n(PDF downloaded - please attach from your device)")}`;
@@ -140,7 +166,11 @@ export async function whatsappPNG(
   a.href = url;
   a.download = filename.endsWith(".png") ? filename : filename + ".png";
   a.click();
-  const cleanPhone = (phone ?? "").replace(/\D/g, "");
+  
+  let cleanPhone = (phone ?? "").replace(/\D/g, "");
+  if (cleanPhone.length === 10) {
+    cleanPhone = "91" + cleanPhone;
+  }
   const waUrl = cleanPhone
     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text + "\n\n(PNG downloaded - please attach from your device)")}`
     : `https://wa.me/?text=${encodeURIComponent(text + "\n\n(PNG downloaded - please attach from your device)")}`;
