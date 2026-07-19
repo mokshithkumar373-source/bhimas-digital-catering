@@ -3,7 +3,11 @@ import jsPDF from "jspdf";
 
 export async function nodeToCanvas(node: HTMLElement) {
   if (typeof document !== "undefined" && document.fonts) {
-    await document.fonts.ready;
+    try {
+      await document.fonts.ready;
+    } catch (e) {
+      console.warn("Failed to wait for fonts to load, proceeding with render:", e);
+    }
   }
   return await html2canvas(node, {
     scale: 3,
@@ -86,7 +90,8 @@ export async function generatePDF(node: HTMLElement) {
   w.document.write("Loading PDF preview...");
   try {
     const pdf = await buildPDF(node);
-    const blobUrl = pdf.output("bloburl");
+    const blob = pdf.output("blob");
+    const blobUrl = URL.createObjectURL(blob);
     w.location.href = blobUrl;
   } catch (e) {
     w.close();
