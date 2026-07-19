@@ -1,6 +1,32 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
+const OKLCH_MAP: Record<string, string> = {
+  "--background": "#fcfdfc",
+  "--foreground": "#2e3532",
+  "--card": "#ffffff",
+  "--card-foreground": "#2e3532",
+  "--popover": "#ffffff",
+  "--popover-foreground": "#2e3532",
+  "--primary": "#0a7a3f",
+  "--primary-foreground": "#fcfdfc",
+  "--secondary": "#edf2ef",
+  "--secondary-foreground": "#0e5c32",
+  "--muted": "#f1f4f2",
+  "--muted-foreground": "#73827c",
+  "--accent": "#e5f0e9",
+  "--accent-foreground": "#0e5c32",
+  "--destructive": "#e53e3e",
+  "--destructive-foreground": "#ffffff",
+  "--border": "#e1e7e3",
+  "--input": "#e1e7e3",
+  "--ring": "#0a7a3f",
+  "--brand": "#0a7a3f",
+  "--brand-foreground": "#fcfdfc",
+  "--brand-soft": "#eef7f2",
+  "--sheet-border": "#0a7a3f",
+};
+
 export async function nodeToCanvas(node: HTMLElement) {
   if (typeof document !== "undefined" && document.fonts) {
     try {
@@ -9,12 +35,34 @@ export async function nodeToCanvas(node: HTMLElement) {
       console.warn("Failed to wait for fonts to load, proceeding with render:", e);
     }
   }
-  return await html2canvas(node, {
-    scale: 3,
-    backgroundColor: "#ffffff",
-    useCORS: true,
-    logging: false,
+
+  // Override oklch variables temporarily to prevent html2canvas parsing crashes
+  const originalStyles: Record<string, string> = {};
+  const rootStyle = document.documentElement.style;
+  
+  Object.keys(OKLCH_MAP).forEach((key) => {
+    originalStyles[key] = rootStyle.getPropertyValue(key);
+    rootStyle.setProperty(key, OKLCH_MAP[key]);
   });
+
+  try {
+    return await html2canvas(node, {
+      scale: 3,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+    });
+  } finally {
+    // Restore original styles
+    Object.keys(OKLCH_MAP).forEach((key) => {
+      const orig = originalStyles[key];
+      if (orig) {
+        rootStyle.setProperty(key, orig);
+      } else {
+        rootStyle.removeProperty(key);
+      }
+    });
+  }
 }
 
 // Download PNG file directly
