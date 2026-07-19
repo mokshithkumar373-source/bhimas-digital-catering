@@ -38,20 +38,23 @@ export async function nodeToCanvas(node: HTMLElement) {
     }
   }
 
-  // Intercept getComputedStyle to resolve oklch/oklab dynamically using browser engine
+  // Intercept getComputedStyle safely, binding methods to the target
   const originalGetComputedStyle = window.getComputedStyle;
   
   window.getComputedStyle = function (el, pseudoElt) {
     const style = originalGetComputedStyle(el, pseudoElt);
     return new Proxy(style, {
-      get(target, prop, receiver) {
+      get(target, prop) {
         if (prop === "getPropertyValue") {
           return function (name: string) {
             const val = target.getPropertyValue(name);
             return sanitizeStyleValue(val, originalGetComputedStyle);
           };
         }
-        const val = Reflect.get(target, prop, receiver);
+        const val = target[prop as any];
+        if (typeof val === "function") {
+          return val.bind(target);
+        }
         return typeof val === "string" ? sanitizeStyleValue(val, originalGetComputedStyle) : val;
       }
     });
