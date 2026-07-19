@@ -60,7 +60,7 @@ function SettingsPage() {
     mutationFn: async () => {
       const { error } = await supabase
         .from("business_settings")
-        .update(form)
+        .update(form as never)
         .eq("id", 1);
       if (error) throw error;
     },
