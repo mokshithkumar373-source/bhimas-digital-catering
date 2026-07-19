@@ -62,15 +62,15 @@ const TRANSLATIONS = {
     admin_signature: "అడ్మిన్ సంతకం",
     we_provide: "మేము అందిస్తాము : పేపర్ ప్లేట్లు & పేపర్ రోల్స్",
     rate_details: "ధర వివరాలు",
-    breakfast_rate: "అల్పాహారం :",
-    lunch_rate: "మధ్యాహ్న భోజనం :",
-    dinner_rate: "రాత్రి భోజనం :",
-    tiffin_rate: "రాత్రి టిఫిన్లు :",
-    servers: "సర్వర్లు :",
-    transport: "ట్రాన్స్పోర్ట్ :",
-    total: "మొత్తం :",
-    advance: "అడ్వాన్స్ :",
-    balance: "బ్యాలెన్స్ :",
+    breakfast_rate: "అల్పాహారం",
+    lunch_rate: "మధ్యాహ్న భోజనం",
+    dinner_rate: "రాత్రి భోజనం",
+    tiffin_rate: "రాత్రి టిఫిన్లు",
+    servers: "సర్వర్లు",
+    transport: "ట్రాన్స్పోర్ట్",
+    total: "మొత్తం",
+    advance: "అడ్వాన్స్",
+    balance: "బ్యాలెన్స్",
     you_must_bring: "మీరు తీసుకురావాల్సినవి :",
   },
   en: {
@@ -92,15 +92,15 @@ const TRANSLATIONS = {
     admin_signature: "Admin Signature",
     we_provide: "We Provide : Paper Plates & Paper Rolls",
     rate_details: "Rate Details",
-    breakfast_rate: "Breakfast :",
-    lunch_rate: "Lunch :",
-    dinner_rate: "Dinner :",
-    tiffin_rate: "Night Tiffins :",
-    servers: "Servers :",
-    transport: "Transport :",
-    total: "Total :",
-    advance: "Advance :",
-    balance: "Balance :",
+    breakfast_rate: "Breakfast",
+    lunch_rate: "Lunch",
+    dinner_rate: "Dinner",
+    tiffin_rate: "Night Tiffins",
+    servers: "Servers",
+    transport: "Transport",
+    total: "Total",
+    advance: "Advance",
+    balance: "Balance",
     you_must_bring: "You Must Bring :",
   },
 };
@@ -155,11 +155,15 @@ function AutocompleteInput({
   }, [menuItems, category, value, lang]);
 
   if (isPreviewMode) {
-    return <span className="font-semibold min-h-[1.5em] block text-[#000] text-[16px]">{value || ""}</span>;
+    return (
+      <span className="font-semibold block text-[#000] text-[17px] h-[34px] leading-[34px] overflow-hidden whitespace-nowrap">
+        {value || ""}
+      </span>
+    );
   }
 
   return (
-    <div className="os-autocomplete-wrapper">
+    <div className="os-autocomplete-wrapper w-full h-[34px]">
       <input
         type="text"
         value={value}
@@ -172,7 +176,7 @@ function AutocompleteInput({
           setTimeout(() => setIsOpen(false), 200);
         }}
         placeholder={placeholder}
-        className="os-paper-input animate-none text-[16px]"
+        className="w-full bg-transparent border-none outline-none font-semibold text-[#000] text-[17px] h-[34px] leading-[34px] p-0"
       />
       {isOpen && filtered.length > 0 && (
         <div className="os-autocomplete-dropdown">
@@ -191,6 +195,362 @@ function AutocompleteInput({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+interface ItemListBoxProps {
+  title: string;
+  categoryKey: string;
+  items: OrderItem[];
+  menu: MenuItem[];
+  isPreviewMode: boolean;
+  lang: "te" | "en";
+  onUpdateItemName: (categoryKey: string, indexInCat: number, newName: string) => void;
+  onRemoveItemRow: (categoryKey: string, indexInCat: number) => void;
+}
+
+function ItemListBox({
+  title,
+  categoryKey,
+  items,
+  menu,
+  isPreviewMode,
+  lang,
+  onUpdateItemName,
+  onRemoveItemRow,
+}: ItemListBoxProps) {
+  const categoryItems = useMemo(() => {
+    const rawItems = items.filter((it) => it.category === categoryKey);
+    const padded = [...rawItems];
+    if (padded.length < 7) {
+      const needed = 7 - padded.length;
+      for (let i = 0; i < needed; i++) {
+        padded.push({
+          name: "",
+          category: categoryKey,
+          quantity: 1,
+          sort_order: rawItems.length + i,
+        });
+      }
+    } else if (padded.length > 7) {
+      padded.splice(7);
+    }
+    return padded;
+  }, [items, categoryKey]);
+
+  return (
+    <div 
+      className="border-[1.5px] border-[#0a7a3f] flex flex-col bg-white overflow-hidden" 
+      style={{ height: "274px" }}
+    >
+      <div 
+        className="font-telugu text-center font-bold border-b-[1.5px] border-[#0a7a3f] bg-green-50/10 text-[20px]"
+        style={{ height: "36px", lineHeight: "36px" }}
+      >
+        {title}
+      </div>
+      <div className="flex-1 flex flex-col">
+        {categoryItems.map((item, idx) => (
+          <div
+            key={`${categoryKey}-${idx}`}
+            className="flex items-center px-2 border-b border-[#0a7a3f]/40 last:border-b-0 relative"
+            style={{ height: "34px", lineHeight: "34px" }}
+          >
+            <span 
+              className="text-[#0a7a3f] font-bold mr-1.5 text-[17px]"
+              style={{ minWidth: "18px", height: "34px", lineHeight: "34px" }}
+            >
+              {idx + 1}.
+            </span>
+            <AutocompleteInput
+              value={item.name}
+              onChange={(val) => onUpdateItemName(categoryKey, idx, val)}
+              placeholder=""
+              menuItems={menu}
+              category={categoryKey}
+              isPreviewMode={isPreviewMode}
+              lang={lang}
+            />
+            {!isPreviewMode && item.name && (
+              <button
+                type="button"
+                className="text-destructive hover:scale-110 absolute right-2 top-[8px]"
+                onClick={() => onRemoveItemRow(categoryKey, idx)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface RateDetailsCardProps {
+  order: Partial<Order>;
+  lang: "te" | "en";
+  onChangeOrder: (key: keyof Order, value: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handlePatchDetails: (key: string, val: any) => void;
+  isPreviewMode: boolean;
+  breakfastMembers: number;
+  lunchMembers: number;
+  dinnerMembers: number;
+  tiffinMembers: number;
+  breakfastRate: number;
+  lunchRate: number;
+  dinnerRate: number;
+  tiffinRate: number;
+  serversQty: number;
+  serversRate: number;
+  breakfastTotal: number;
+  lunchTotal: number;
+  dinnerTotal: number;
+  tiffinTotal: number;
+  serversTotal: number;
+  transportTotal: number;
+  grandTotal: number;
+  advance: number;
+  balance: number;
+}
+
+function RateDetailsCard({
+  order,
+  lang,
+  onChangeOrder,
+  handlePatchDetails,
+  isPreviewMode,
+  breakfastMembers,
+  lunchMembers,
+  dinnerMembers,
+  tiffinMembers,
+  breakfastRate,
+  lunchRate,
+  dinnerRate,
+  tiffinRate,
+  serversQty,
+  serversRate,
+  breakfastTotal,
+  lunchTotal,
+  dinnerTotal,
+  tiffinTotal,
+  serversTotal,
+  transportTotal,
+  grandTotal,
+  advance,
+  balance,
+}: RateDetailsCardProps) {
+  const t = TRANSLATIONS[lang || "te"];
+
+  const renderRateRow = (
+    label: string,
+    calcNode: React.ReactNode,
+    totalAmount: number,
+    isLast = false
+  ) => {
+    return (
+      <div className="py-1">
+        {/* Row 1: Category Name only */}
+        <div className="text-[18px] font-bold text-[#0a7a3f] leading-tight">
+          {label}
+        </div>
+        {/* Row 2: Calculation (Left) and Final Amount (Right) */}
+        <div className="grid grid-cols-[1fr_auto] items-baseline mt-0.5">
+          <div className="text-[17px] text-[#0a7a3f] font-semibold flex items-center gap-1">
+            {calcNode}
+          </div>
+          <div className="text-[22px] font-bold text-[#000]">
+            {formatINR(totalAmount)}
+          </div>
+        </div>
+        {!isLast && <hr className="border-t border-dashed border-[#0a7a3f]/40 my-1" />}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      <div 
+        className="font-telugu text-center font-bold border-b-[1.5px] border-[#0a7a3f] bg-green-50/20 text-[20px]"
+        style={{ height: "36px", lineHeight: "36px" }}
+      >
+        {t.rate_details}
+      </div>
+
+      <div className="flex-1 p-2 space-y-0.5 overflow-visible">
+        {/* Breakfast */}
+        {renderRateRow(
+          t.breakfast_rate,
+          !isPreviewMode ? (
+            <span className="flex items-center">
+              ₹
+              <input
+                type="number"
+                value={breakfastRate || ""}
+                onChange={(e) => onChangeOrder("breakfast_rate", Number(e.target.value))}
+                className="w-14 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+              × {breakfastMembers}
+            </span>
+          ) : (
+            <span>₹{breakfastRate} × {breakfastMembers}</span>
+          ),
+          breakfastTotal
+        )}
+
+        {/* Lunch */}
+        {renderRateRow(
+          t.lunch_rate,
+          !isPreviewMode ? (
+            <span className="flex items-center">
+              ₹
+              <input
+                type="number"
+                value={lunchRate || ""}
+                onChange={(e) => onChangeOrder("lunch_rate", Number(e.target.value))}
+                className="w-14 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+              × {lunchMembers}
+            </span>
+          ) : (
+            <span>₹{lunchRate} × {lunchMembers}</span>
+          ),
+          lunchTotal
+        )}
+
+        {/* Dinner */}
+        {renderRateRow(
+          t.dinner_rate,
+          !isPreviewMode ? (
+            <span className="flex items-center">
+              ₹
+              <input
+                type="number"
+                value={dinnerRate || ""}
+                onChange={(e) => onChangeOrder("dinner_rate", Number(e.target.value))}
+                className="w-14 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+              × {dinnerMembers}
+            </span>
+          ) : (
+            <span>₹{dinnerRate} × {dinnerMembers}</span>
+          ),
+          dinnerTotal
+        )}
+
+        {/* Night Tiffins */}
+        {renderRateRow(
+          t.tiffin_rate,
+          !isPreviewMode ? (
+            <span className="flex items-center gap-0.5">
+              ₹
+              <input
+                type="number"
+                value={tiffinRate || ""}
+                onChange={(e) => onChangeOrder("tiffin_rate", Number(e.target.value))}
+                className="w-12 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+              ×
+              <input
+                type="number"
+                value={tiffinMembers || ""}
+                onChange={(e) => handlePatchDetails("tiffin_members", Number(e.target.value))}
+                className="w-10 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+            </span>
+          ) : (
+            <span>₹{tiffinRate} × {tiffinMembers}</span>
+          ),
+          tiffinTotal
+        )}
+
+        {/* Servers */}
+        {renderRateRow(
+          t.servers,
+          !isPreviewMode ? (
+            <span className="flex items-center gap-0.5">
+              <input
+                type="number"
+                value={serversQty || ""}
+                onChange={(e) => handlePatchDetails("servers_qty", Number(e.target.value))}
+                className="w-10 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+              × ₹
+              <input
+                type="number"
+                value={serversRate || ""}
+                onChange={(e) => onChangeOrder("servers_charge", Number(e.target.value))}
+                className="w-12 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+            </span>
+          ) : (
+            <span>{serversQty} × ₹{serversRate}</span>
+          ),
+          serversTotal
+        )}
+
+        {/* Transport */}
+        {renderRateRow(
+          t.transport,
+          !isPreviewMode ? (
+            <span className="flex items-center">
+              ₹
+              <input
+                type="number"
+                value={order.transport_charge || ""}
+                onChange={(e) => onChangeOrder("transport_charge", Number(e.target.value))}
+                className="w-14 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none h-6 p-0"
+                placeholder="0"
+              />
+            </span>
+          ) : (
+            <span>₹{transportTotal}</span>
+          ),
+          transportTotal,
+          true
+        )}
+      </div>
+
+      {/* Totals Block - Separated Visually */}
+      <div className="border-t-[1.5px] border-[#0a7a3f] mt-auto">
+        {/* Total */}
+        <div className="border-b-[1.5px] border-[#0a7a3f] p-2 bg-[#e6f3eb]/20 flex justify-between items-center h-[38px]">
+          <span className="text-[18px] font-bold text-[#0a7a3f]">{t.total}</span>
+          <span className="text-[22px] font-bold text-[#0a522c]">{formatINR(grandTotal)}</span>
+        </div>
+        {/* Advance */}
+        <div className="border-b-[1.5px] border-[#0a7a3f] p-2 flex justify-between items-center h-[38px]">
+          <span className="text-[18px] font-bold text-[#0a7a3f]">{t.advance}</span>
+          {isPreviewMode ? (
+            <span className="text-[22px] font-bold text-[#000]">{formatINR(advance)}</span>
+          ) : (
+            <span className="flex items-center gap-0.5">
+              <span className="text-[18px] font-bold text-[#0a7a3f]">₹</span>
+              <input
+                type="number"
+                value={order.advance || ""}
+                onChange={(e) => onChangeOrder("advance", Number(e.target.value))}
+                className="w-20 border-b border-green-600/60 text-center font-bold text-[#000] bg-transparent text-[18px] outline-none h-7 p-0"
+                placeholder="0"
+              />
+            </span>
+          )}
+        </div>
+        {/* Balance */}
+        <div className="p-2 bg-red-50/10 flex justify-between items-center h-[38px]">
+          <span className="text-[18px] font-bold text-[#0a7a3f]">{t.balance}</span>
+          <span className="text-[22px] font-bold text-[#c53030]">{formatINR(balance)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -326,59 +686,6 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
       };
       onChangeItems(updated);
     }
-  };
-
-  const renderCategoryBox = (teluguTitle: string, categoryKey: string) => {
-    const rawCategoryItems = items.filter((it) => it.category === categoryKey);
-    
-    // Pad to exactly 7 items
-    const categoryItems = [...rawCategoryItems];
-    if (categoryItems.length < 7) {
-      const needed = 7 - categoryItems.length;
-      for (let i = 0; i < needed; i++) {
-        categoryItems.push({
-          name: "",
-          category: categoryKey,
-          quantity: 1,
-          sort_order: rawCategoryItems.length + i,
-        });
-      }
-    } else if (categoryItems.length > 7) {
-      categoryItems.splice(7);
-    }
-
-    return (
-      <div className="flex flex-col flex-1 min-h-0 h-full os-box">
-        <div className="os-box-title font-telugu relative py-1 border-b-2 border-[#0a7a3f]">
-          <span>{teluguTitle}</span>
-        </div>
-        <div className="flex-1 p-1 space-y-0.5 overflow-visible">
-          {categoryItems.map((item, idx) => (
-            <div key={`${categoryKey}-${idx}`} className="os-item-row">
-              <span className="os-item-number">{idx + 1}.</span>
-              <AutocompleteInput
-                value={item.name}
-                onChange={(val) => handleUpdateItemName(categoryKey, idx, val)}
-                placeholder=""
-                menuItems={menu}
-                category={categoryKey}
-                isPreviewMode={isPreviewMode}
-                lang={lang}
-              />
-              {!isPreviewMode && item.name && (
-                <button
-                  type="button"
-                  className="os-row-action text-destructive hover:scale-110 absolute right-1"
-                  onClick={() => handleRemoveItemRow(categoryKey, idx)}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -588,20 +895,56 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
             {/* Row 2: Sweets & Hot Items and Curry Items */}
             <div className="flex w-full border-b-2 border-[#0a7a3f] flex-1 min-h-0">
               <div className="border-r-2 border-[#0a7a3f] flex flex-col flex-1 min-h-0" style={{ width: "50%" }}>
-                {renderCategoryBox(t.sweets, "Sweets")}
+                <ItemListBox
+                  title={t.sweets}
+                  categoryKey="Sweets"
+                  items={items}
+                  menu={menu}
+                  isPreviewMode={isPreviewMode}
+                  lang={lang}
+                  onUpdateItemName={handleUpdateItemName}
+                  onRemoveItemRow={handleRemoveItemRow}
+                />
               </div>
               <div className="flex flex-col flex-1 min-h-0" style={{ width: "50%" }}>
-                {renderCategoryBox(t.curries, "Curries")}
+                <ItemListBox
+                  title={t.curries}
+                  categoryKey="Curries"
+                  items={items}
+                  menu={menu}
+                  isPreviewMode={isPreviewMode}
+                  lang={lang}
+                  onUpdateItemName={handleUpdateItemName}
+                  onRemoveItemRow={handleRemoveItemRow}
+                />
               </div>
             </div>
 
             {/* Row 3: Rice Items and Other Items */}
             <div className="flex w-full border-b-2 border-[#0a7a3f] flex-1 min-h-0">
               <div className="border-r-2 border-[#0a7a3f] flex flex-col flex-1 min-h-0" style={{ width: "50%" }}>
-                {renderCategoryBox(t.rice, "Rice")}
+                <ItemListBox
+                  title={t.rice}
+                  categoryKey="Rice"
+                  items={items}
+                  menu={menu}
+                  isPreviewMode={isPreviewMode}
+                  lang={lang}
+                  onUpdateItemName={handleUpdateItemName}
+                  onRemoveItemRow={handleRemoveItemRow}
+                />
               </div>
               <div className="flex flex-col flex-1 min-h-0" style={{ width: "50%" }}>
-                {renderCategoryBox(t.other, "Snacks")}
+                <ItemListBox
+                  title={t.other}
+                  categoryKey="Snacks"
+                  items={items}
+                  menu={menu}
+                  isPreviewMode={isPreviewMode}
+                  lang={lang}
+                  onUpdateItemName={handleUpdateItemName}
+                  onRemoveItemRow={handleRemoveItemRow}
+                />
               </div>
             </div>
 
@@ -622,200 +965,32 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
           <div className="os-right-column flex flex-col h-full min-h-0">
             {/* Rate Details Panel */}
             <div className="flex-grow flex flex-col border-b-2 border-[#0a7a3f] min-h-0 flex-1">
-              <div className="os-box-title font-telugu border-b bg-green-50/20 py-1.5 font-bold text-[#0a7a3f] border-[#0a7a3f] !text-[22px]">
-                {t.rate_details}
-              </div>
-
-              <div className="flex-grow flex flex-col p-1 font-telugu justify-between min-h-0 space-y-1">
-                {/* Breakfast Rate */}
-                <div className="os-rate-row">
-                  <span className="rate-label">{t.breakfast_rate}</span>
-                  <div className="rate-calc">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={breakfastRate || ""}
-                          onChange={(e) => onChangeOrder("breakfast_rate", Number(e.target.value))}
-                          className="w-14 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                    ) : (
-                      <span>₹{breakfastRate}</span>
-                    )}
-                    <span>× {breakfastMembers} =</span>
-                  </div>
-                  <span className="rate-amount">{formatINR(breakfastTotal)}</span>
-                </div>
-
-                {/* Lunch Rate */}
-                <div className="os-rate-row">
-                  <span className="rate-label">{t.lunch_rate}</span>
-                  <div className="rate-calc">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={lunchRate || ""}
-                          onChange={(e) => onChangeOrder("lunch_rate", Number(e.target.value))}
-                          className="w-14 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                    ) : (
-                      <span>₹{lunchRate}</span>
-                    )}
-                    <span>× {lunchMembers} =</span>
-                  </div>
-                  <span className="rate-amount">{formatINR(lunchTotal)}</span>
-                </div>
-
-                {/* Dinner Rate */}
-                <div className="os-rate-row">
-                  <span className="rate-label">{t.dinner_rate}</span>
-                  <div className="rate-calc">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={dinnerRate || ""}
-                          onChange={(e) => onChangeOrder("dinner_rate", Number(e.target.value))}
-                          className="w-14 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                    ) : (
-                      <span>₹{dinnerRate}</span>
-                    )}
-                    <span>× {dinnerMembers} =</span>
-                  </div>
-                  <span className="rate-amount">{formatINR(dinnerTotal)}</span>
-                </div>
-
-                {/* Night Tiffin Rate */}
-                <div className="os-rate-row">
-                  <span className="rate-label">{t.tiffin_rate}</span>
-                  <div className="rate-calc font-sans flex items-center justify-end gap-1 text-[17px]">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <span className="font-telugu text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={tiffinRate || ""}
-                          onChange={(e) => onChangeOrder("tiffin_rate", Number(e.target.value))}
-                          className="w-14 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="0"
-                        />
-                        <span className="mx-0.5">×</span>
-                        <input
-                          type="number"
-                          value={tiffinMembers || ""}
-                          onChange={(e) => handlePatchDetails("tiffin_members", Number(e.target.value))}
-                          className="w-12 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="Qty"
-                        />
-                      </div>
-                    ) : (
-                      <span>₹{tiffinRate} × {tiffinMembers}</span>
-                    )}
-                    <span>=</span>
-                  </div>
-                  <span className="rate-amount">{formatINR(tiffinTotal)}</span>
-                </div>
-
-                {/* Servers Qty x Rate */}
-                <div className="os-rate-row">
-                  <span className="rate-label">{t.servers}</span>
-                  <div className="rate-calc font-sans flex items-center justify-end gap-1 text-[17px]">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <input
-                          type="number"
-                          value={serversQty || ""}
-                          onChange={(e) => handlePatchDetails("servers_qty", Number(e.target.value))}
-                          className="w-10 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="Qty"
-                        />
-                        <span className="mx-0.5">×</span>
-                        <span className="font-telugu text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={serversRate || ""}
-                          onChange={(e) => onChangeOrder("servers_charge", Number(e.target.value))}
-                          className="w-14 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="Rate"
-                        />
-                      </div>
-                    ) : (
-                      <span>{serversQty} × ₹{serversRate}</span>
-                    )}
-                    <span>=</span>
-                  </div>
-                  <span className="rate-amount">{formatINR(serversTotal)}</span>
-                </div>
-
-                {/* Transport flat */}
-                <div className="os-rate-row">
-                  <span className="rate-label">{t.transport}</span>
-                  <div className="rate-calc">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={order.transport_charge || ""}
-                          onChange={(e) => onChangeOrder("transport_charge", Number(e.target.value))}
-                          className="w-16 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                    ) : (
-                      <span>₹{transportTotal}</span>
-                    )}
-                  </div>
-                  <span className="rate-amount">{formatINR(transportTotal)}</span>
-                </div>
-
-                {/* Total */}
-                <div className="os-rate-row is-total bg-slate-50/50">
-                  <span className="rate-label">{t.total}</span>
-                  <div className="rate-calc"></div>
-                  <span className="rate-amount">{formatINR(grandTotal)}</span>
-                </div>
-
-                {/* Advance */}
-                <div className="os-rate-row is-advance">
-                  <span className="rate-label">{t.advance}</span>
-                  <div className="rate-calc">
-                    {!isPreviewMode ? (
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[17px]">₹</span>
-                        <input
-                          type="number"
-                          value={order.advance || ""}
-                          onChange={(e) => onChangeOrder("advance", Number(e.target.value))}
-                          className="w-20 border-b border-green-600 text-center font-bold text-[#000] bg-transparent text-[17px] outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                    ) : (
-                      <span>₹{advance}</span>
-                    )}
-                  </div>
-                  <span className="rate-amount">{formatINR(advance)}</span>
-                </div>
-
-                {/* Balance */}
-                <div className="os-rate-row is-balance">
-                  <span className="rate-label">{t.balance}</span>
-                  <div className="rate-calc"></div>
-                  <span className="rate-amount">{formatINR(balance)}</span>
-                </div>
-              </div>
+              <RateDetailsCard
+                order={order}
+                lang={lang}
+                onChangeOrder={onChangeOrder}
+                handlePatchDetails={handlePatchDetails}
+                isPreviewMode={isPreviewMode}
+                breakfastMembers={breakfastMembers}
+                lunchMembers={lunchMembers}
+                dinnerMembers={dinnerMembers}
+                tiffinMembers={tiffinMembers}
+                breakfastRate={breakfastRate}
+                lunchRate={lunchRate}
+                dinnerRate={dinnerRate}
+                tiffinRate={tiffinRate}
+                serversQty={serversQty}
+                serversRate={serversRate}
+                breakfastTotal={breakfastTotal}
+                lunchTotal={lunchTotal}
+                dinnerTotal={dinnerTotal}
+                tiffinTotal={tiffinTotal}
+                serversTotal={serversTotal}
+                transportTotal={transportTotal}
+                grandTotal={grandTotal}
+                advance={advance}
+                balance={balance}
+              />
             </div>
 
             {/* Checklist: You Must Bring */}
