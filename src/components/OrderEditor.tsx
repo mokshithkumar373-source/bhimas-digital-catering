@@ -367,8 +367,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       await generatePDF(sheetRef.current);
       toast.success("PDF opened in new window", { id: tId });
     } catch (e: any) {
-      console.error("PDF Generation Error (Preview):", e);
-      toast.error(`Failed to generate PDF preview: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
@@ -382,8 +382,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       await downloadPDF(sheetRef.current, pdfFilename);
       toast.success("PDF downloaded successfully", { id: tId });
     } catch (e: any) {
-      console.error("PDF Download Error:", e);
-      toast.error(`Failed to download PDF: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
@@ -397,8 +397,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       await generatePNG(sheetRef.current);
       toast.success("PNG opened in new window", { id: tId });
     } catch (e: any) {
-      console.error("PNG Generation Error (Preview):", e);
-      toast.error(`Failed to generate PNG preview: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
@@ -412,8 +412,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       await downloadPNG(sheetRef.current, pdfFilename);
       toast.success("PNG downloaded successfully", { id: tId });
     } catch (e: any) {
-      console.error("PNG Download Error:", e);
-      toast.error(`Failed to download PNG: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
@@ -425,8 +425,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
     try {
       printNode(sheetRef.current);
     } catch (e: any) {
-      console.error("Print Error:", e);
-      toast.error(`Print failed: ${e?.message || e}`);
+      console.error(e);
+      toast.error(e?.message || String(e));
     }
   };
 
@@ -449,8 +449,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       );
       toast.success("WhatsApp shared link opened", { id: tId });
     } catch (e: any) {
-      console.error("WhatsApp PDF Share Error:", e);
-      toast.error(`Failed to share PDF: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
@@ -469,8 +469,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       );
       toast.success("WhatsApp shared link opened", { id: tId });
     } catch (e: any) {
-      console.error("WhatsApp PNG Share Error:", e);
-      toast.error(`Failed to share PNG: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
@@ -484,8 +484,8 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       await shareNode(sheetRef.current, pdfFilename, getWhatsAppText());
       toast.success("Sharing opened", { id: tId });
     } catch (e: any) {
-      console.error("Native Share Error:", e);
-      toast.error(`Failed to share document: ${e?.message || e}`, { id: tId });
+      console.error(e);
+      toast.error(e?.message || String(e), { id: tId });
     }
   };
 
