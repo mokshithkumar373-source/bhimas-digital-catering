@@ -599,7 +599,7 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
   }
 
   // Format YYYY-MM-DD to DD / MM / YYYY
-  const formatDate = (dateStr?: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "";
     const parts = dateStr.split("-");
     if (parts.length !== 3) return dateStr;
