@@ -57,9 +57,9 @@ export async function nodeToCanvas(node: HTMLElement) {
             return sanitizeStyleValue(val, originalGetComputedStyle);
           };
         }
-        const val = target[prop as any];
+        const val = (target as any)[prop as any];
         if (typeof val === "function") {
-          return val.bind(target);
+          return (val as Function).bind(target);
         }
         return typeof val === "string" ? sanitizeStyleValue(val, originalGetComputedStyle) : val;
       }
