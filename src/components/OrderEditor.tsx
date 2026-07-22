@@ -44,30 +44,6 @@ export interface OrderEditorProps {
 
 const STATUSES = ["Pending", "Preparing", "Ready", "Delivered", "Completed", "Cancelled"];
 
-const MIN_ROWS: Record<string, number> = {
-  Sweets: 7,
-  Curries: 7,
-  Rice: 7,
-  Snacks: 7,
-};
-
-function padItems(loadedItems: OrderItem[]) {
-  const padded = [...loadedItems];
-  Object.entries(MIN_ROWS).forEach(([cat, min]) => {
-    const existing = padded.filter((i) => i.category === cat);
-    const needed = min - existing.length;
-    for (let i = 0; i < needed; i++) {
-      padded.push({
-        name: "",
-        category: cat,
-        quantity: 1,
-        sort_order: existing.length + i,
-      });
-    }
-  });
-  return padded;
-}
-
 export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditorProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -100,7 +76,7 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
   });
 
   const [items, setItems] = useState<OrderItem[]>(() => {
-    return padItems(initialItems ?? []);
+    return initialItems ?? [];
   });
 
   // Client-side initialization after mount (SSR Safety)
@@ -113,7 +89,7 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       try {
         const parsed = JSON.parse(draft);
         if (parsed.order) setOrder(parsed.order);
-        if (parsed.items) setItems(padItems(parsed.items));
+        if (parsed.items) setItems(parsed.items);
         toast.info("Restored unsaved local draft");
         return;
       } catch (e) {
@@ -128,7 +104,7 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
         try {
           const parsed = JSON.parse(dup);
           if (parsed.order) setOrder(parsed.order);
-          if (parsed.items) setItems(padItems(parsed.items));
+          if (parsed.items) setItems(parsed.items);
         } catch (e) {
           // ignore
         }

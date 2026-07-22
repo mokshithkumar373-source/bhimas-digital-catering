@@ -5,7 +5,7 @@ const EXPORT_OPTIONS = {
   pixelRatio: 3,
   backgroundColor: "#ffffff",
   cacheBust: true,
-  skipFonts: false,
+  skipFonts: true,
 };
 
 /**

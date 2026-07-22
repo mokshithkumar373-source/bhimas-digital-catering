@@ -208,6 +208,7 @@ interface ItemListBoxProps {
   lang: "te" | "en";
   onUpdateItemName: (categoryKey: string, indexInCat: number, newName: string) => void;
   onRemoveItemRow: (categoryKey: string, indexInCat: number) => void;
+  onAddRow: (categoryKey: string) => void;
 }
 
 function ItemListBox({
@@ -219,63 +220,74 @@ function ItemListBox({
   lang,
   onUpdateItemName,
   onRemoveItemRow,
+  onAddRow,
 }: ItemListBoxProps) {
   const categoryItems = useMemo(() => {
     const rawItems = items.filter((it) => it.category === categoryKey);
-    const padded = [...rawItems];
-    if (padded.length < 7) {
-      const needed = 7 - padded.length;
-      for (let i = 0; i < needed; i++) {
-        padded.push({
+    if (isPreviewMode) {
+      return rawItems.filter((it) => it.name.trim() !== "");
+    }
+    if (rawItems.length === 0) {
+      return [
+        {
           name: "",
           category: categoryKey,
           quantity: 1,
-          sort_order: rawItems.length + i,
-        });
-      }
-    } else if (padded.length > 7) {
-      padded.splice(7);
+          sort_order: 0,
+        },
+      ];
     }
-    return padded;
-  }, [items, categoryKey]);
+    return rawItems;
+  }, [items, categoryKey, isPreviewMode]);
 
   return (
-    <div 
-      className="border-[1.5px] border-[#0a7a3f] flex flex-col bg-white overflow-hidden" 
-      style={{ height: "274px" }}
+    <div
+      className="border-[1.5px] border-[#0a7a3f] flex flex-col bg-white overflow-y-auto print:overflow-visible h-full"
+      style={{ minHeight: "274px", height: isPreviewMode ? "auto" : "274px" }}
     >
-      <div 
-        className="font-telugu text-center font-bold border-b-[1.5px] border-[#0a7a3f] bg-green-50/10 text-[20px]"
+      <div
+        className="font-telugu text-center font-bold border-b-[1.5px] border-[#0a7a3f] bg-green-50/10 text-[20px] relative"
         style={{ height: "36px", lineHeight: "36px" }}
       >
         {title}
+        {!isPreviewMode && (
+          <button
+            type="button"
+            onClick={() => onAddRow(categoryKey)}
+            className="absolute right-2 top-1.5 bg-[#0a7a3f] hover:bg-[#085a2e] text-white rounded w-6 h-6 flex items-center justify-center font-bold text-[18px] cursor-pointer"
+          >
+            +
+          </button>
+        )}
       </div>
       <div className="flex-1 flex flex-col">
         {categoryItems.map((item, idx) => (
           <div
             key={`${categoryKey}-${idx}`}
-            className="flex items-center px-2 border-b border-[#0a7a3f]/40 last:border-b-0 relative"
+            className="flex items-center px-2 border-b border-[#0a7a3f]/40 last:border-b-0 gap-1.5"
             style={{ height: "34px", lineHeight: "34px" }}
           >
-            <span 
-              className="text-[#0a7a3f] font-bold mr-1.5 text-[17px]"
+            <span
+              className="text-[#0a7a3f] font-bold text-[17px]"
               style={{ minWidth: "18px", height: "34px", lineHeight: "34px" }}
             >
               {idx + 1}.
             </span>
-            <AutocompleteInput
-              value={item.name}
-              onChange={(val) => onUpdateItemName(categoryKey, idx, val)}
-              placeholder=""
-              menuItems={menu}
-              category={categoryKey}
-              isPreviewMode={isPreviewMode}
-              lang={lang}
-            />
-            {!isPreviewMode && item.name && (
+            <div className="flex-1 min-w-0">
+              <AutocompleteInput
+                value={item.name}
+                onChange={(val) => onUpdateItemName(categoryKey, idx, val)}
+                placeholder=""
+                menuItems={menu}
+                category={categoryKey}
+                isPreviewMode={isPreviewMode}
+                lang={lang}
+              />
+            </div>
+            {!isPreviewMode && (
               <button
                 type="button"
-                className="text-destructive hover:scale-110 absolute right-2 top-[8px]"
+                className="text-destructive hover:scale-110 flex-shrink-0 cursor-pointer p-1"
                 onClick={() => onRemoveItemRow(categoryKey, idx)}
               >
                 <X className="h-3.5 w-3.5" />
@@ -680,12 +692,21 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
     });
 
     if (catIndices[indexInCat] !== undefined) {
-      updated[catIndices[indexInCat]] = {
-        ...updated[catIndices[indexInCat]],
-        name: "",
-      };
+      updated.splice(catIndices[indexInCat], 1);
       onChangeItems(updated);
     }
+  };
+
+  const handleAddItemRow = (categoryKey: string) => {
+    const newItems = [...items];
+    const catItems = items.filter((it) => it.category === categoryKey);
+    newItems.push({
+      name: "",
+      category: categoryKey,
+      quantity: 1,
+      sort_order: catItems.length,
+    });
+    onChangeItems(newItems);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -812,23 +833,14 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   {isPreviewMode ? (
                     <span className="font-bold text-[#000] text-[16px]">{breakfastMembers}</span>
                   ) : (
-                    <div className="flex items-center gap-0.5">
-                      <input
-                        type="number"
-                        value={breakfastMembers}
-                        onChange={(e) =>
-                          handlePatchDetails("breakfast_members", Number(e.target.value))
-                        }
-                        className="w-10 text-center border-b border-green-600 outline-none text-[#000] font-bold bg-transparent text-[16px]"
-                      />
-                      <button
-                        type="button"
-                        className="os-plus-btn-small"
-                        onClick={() => handlePatchDetails("breakfast_members", breakfastMembers + 10)}
-                      >
-                        +
-                      </button>
-                    </div>
+                    <input
+                      type="number"
+                      value={breakfastMembers}
+                      onChange={(e) =>
+                        handlePatchDetails("breakfast_members", Number(e.target.value))
+                      }
+                      className="w-16 text-center border-b border-green-600 outline-none text-[#000] font-bold bg-transparent text-[16px] ml-2"
+                    />
                   )}
                 </div>
               </div>
@@ -841,23 +853,14 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   {isPreviewMode ? (
                     <span className="font-bold text-[#000] text-[16px]">{lunchMembers}</span>
                   ) : (
-                    <div className="flex items-center gap-0.5">
-                      <input
-                        type="number"
-                        value={lunchMembers}
-                        onChange={(e) =>
-                          handlePatchDetails("lunch_members", Number(e.target.value))
-                        }
-                        className="w-10 text-center border-b border-green-600 outline-none text-[#000] font-bold bg-transparent text-[16px]"
-                      />
-                      <button
-                        type="button"
-                        className="os-plus-btn-small"
-                        onClick={() => handlePatchDetails("lunch_members", lunchMembers + 10)}
-                      >
-                        +
-                      </button>
-                    </div>
+                    <input
+                      type="number"
+                      value={lunchMembers}
+                      onChange={(e) =>
+                        handlePatchDetails("lunch_members", Number(e.target.value))
+                      }
+                      className="w-16 text-center border-b border-green-600 outline-none text-[#000] font-bold bg-transparent text-[16px] ml-2"
+                    />
                   )}
                 </div>
               </div>
@@ -870,23 +873,14 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   {isPreviewMode ? (
                     <span className="font-bold text-[#000] text-[16px]">{dinnerMembers}</span>
                   ) : (
-                    <div className="flex items-center gap-0.5">
-                      <input
-                        type="number"
-                        value={dinnerMembers}
-                        onChange={(e) =>
-                          handlePatchDetails("dinner_members", Number(e.target.value))
-                        }
-                        className="w-10 text-center border-b border-green-600 outline-none text-[#000] font-bold bg-transparent text-[16px]"
-                      />
-                      <button
-                        type="button"
-                        className="os-plus-btn-small"
-                        onClick={() => handlePatchDetails("dinner_members", dinnerMembers + 10)}
-                      >
-                        +
-                      </button>
-                    </div>
+                    <input
+                      type="number"
+                      value={dinnerMembers}
+                      onChange={(e) =>
+                        handlePatchDetails("dinner_members", Number(e.target.value))
+                      }
+                      className="w-16 text-center border-b border-green-600 outline-none text-[#000] font-bold bg-transparent text-[16px] ml-2"
+                    />
                   )}
                 </div>
               </div>
@@ -904,6 +898,7 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   lang={lang}
                   onUpdateItemName={handleUpdateItemName}
                   onRemoveItemRow={handleRemoveItemRow}
+                  onAddRow={handleAddItemRow}
                 />
               </div>
               <div className="flex flex-col flex-1 min-h-0" style={{ width: "50%" }}>
@@ -916,6 +911,7 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   lang={lang}
                   onUpdateItemName={handleUpdateItemName}
                   onRemoveItemRow={handleRemoveItemRow}
+                  onAddRow={handleAddItemRow}
                 />
               </div>
             </div>
@@ -932,6 +928,7 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   lang={lang}
                   onUpdateItemName={handleUpdateItemName}
                   onRemoveItemRow={handleRemoveItemRow}
+                  onAddRow={handleAddItemRow}
                 />
               </div>
               <div className="flex flex-col flex-1 min-h-0" style={{ width: "50%" }}>
@@ -944,6 +941,7 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
                   lang={lang}
                   onUpdateItemName={handleUpdateItemName}
                   onRemoveItemRow={handleRemoveItemRow}
+                  onAddRow={handleAddItemRow}
                 />
               </div>
             </div>

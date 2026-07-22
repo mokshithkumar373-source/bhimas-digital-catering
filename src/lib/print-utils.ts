@@ -10,7 +10,7 @@ export function printNode(node: HTMLElement): void {
     .join("\n");
 
   w.document.write(
-    `<!doctype html><html><head><meta charset="utf-8">${styles}</head><body class="print-area">${node.outerHTML}<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8">${styles}</head><body><div class="print-area">${node.outerHTML}</div><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}</script></body></html>`,
   );
   w.document.close();
 }
