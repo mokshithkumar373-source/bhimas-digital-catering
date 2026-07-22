@@ -70,7 +70,7 @@ export async function whatsappPDF(
   pdf.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
   openWhatsApp(cleanPhone, text);
   const { toast } = await import("sonner");
-  toast.info("PDF is ready. Please attach the downloaded file and send.");
+  toast.success("WhatsApp chat opened successfully. Please attach the generated PDF and send.");
 }
 
 /**
@@ -98,7 +98,7 @@ export async function whatsappPNG(
   a.click();
   openWhatsApp(cleanPhone, text);
   const { toast } = await import("sonner");
-  toast.info("PNG is ready. Please attach the downloaded file and send.");
+  toast.success("WhatsApp chat opened successfully. Please attach the generated PNG and send.");
 }
 
 /**
