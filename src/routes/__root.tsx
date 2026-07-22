@@ -77,10 +77,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Fast, mobile-friendly catering order sheets, PDF and WhatsApp sharing, dashboard analytics.",
+          "Bhimas Catering order management: create orders, generate PDFs, track revenue and customers.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Bhimas Catering — Order Management" },
+      { name: "twitter:description", content: "Bhimas Catering order management: create orders, generate PDFs, track revenue and customers." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fce237a7-354b-4d2d-8e7d-85cd934b46d8/id-preview-141955af--6e1bb42f-3e76-472d-9fd2-e4c6bbaac139.lovable.app-1784716913792.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fce237a7-354b-4d2d-8e7d-85cd934b46d8/id-preview-141955af--6e1bb42f-3e76-472d-9fd2-e4c6bbaac139.lovable.app-1784716913792.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
