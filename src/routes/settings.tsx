@@ -32,6 +32,7 @@ function SettingsPage() {
   const [form, setForm] = useState<Record<string, string>>({});
   useEffect(() => {
     if (settings) {
+      const localWhatsapp = typeof window !== "undefined" ? localStorage.getItem("bhimas_whatsapp_number") : null;
       setForm({
         business_name: settings.business_name ?? "",
         tagline: settings.tagline ?? "",
@@ -40,15 +41,21 @@ function SettingsPage() {
         gst_number: settings.gst_number ?? "",
         footer: settings.footer ?? "",
         terms: settings.terms ?? "",
+        whatsapp_number: localWhatsapp || settings.phone || "",
       });
     }
   }, [settings]);
 
   const saveSettings = useMutation({
     mutationFn: async () => {
+      if (typeof window !== "undefined" && form.whatsapp_number) {
+        localStorage.setItem("bhimas_whatsapp_number", form.whatsapp_number);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { whatsapp_number, ...dbPayload } = form;
       const { error } = await supabase
         .from("business_settings")
-        .update(form as never)
+        .update(dbPayload as never)
         .eq("id", 1);
       if (error) throw error;
     },
@@ -114,6 +121,11 @@ function SettingsPage() {
               label="Phone"
               value={form.phone}
               onChange={(v) => setForm({ ...form, phone: v })}
+            />
+            <TextField
+              label="WhatsApp Number"
+              value={form.whatsapp_number}
+              onChange={(v) => setForm({ ...form, whatsapp_number: v })}
             />
             <div>
               <Label className="mb-1.5 block text-xs font-semibold text-muted-foreground">

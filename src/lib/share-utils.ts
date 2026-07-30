@@ -29,7 +29,12 @@ export function normalizeIndianPhone(phone?: string | null): string {
 }
 
 function openWhatsApp(cleanPhone: string, text: string) {
-  const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  const isMobile = typeof navigator !== "undefined" && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+  const url = isMobile
+    ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
+    : `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`;
   window.open(url, "_blank");
 }
 
@@ -70,7 +75,7 @@ export async function whatsappPDF(
   pdf.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
   openWhatsApp(cleanPhone, text);
   const { toast } = await import("sonner");
-  toast.success("WhatsApp chat opened successfully. Please attach the generated PDF and send.");
+  toast.info("Your file has been downloaded. Please attach it in WhatsApp and send.", { duration: 6000 });
 }
 
 /**
@@ -98,7 +103,7 @@ export async function whatsappPNG(
   a.click();
   openWhatsApp(cleanPhone, text);
   const { toast } = await import("sonner");
-  toast.success("WhatsApp chat opened successfully. Please attach the generated PNG and send.");
+  toast.info("Your file has been downloaded. Please attach it in WhatsApp and send.", { duration: 6000 });
 }
 
 /**
