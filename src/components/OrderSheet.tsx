@@ -1,4 +1,4 @@
-import { forwardRef, useState, useMemo, useEffect } from "react";
+import { forwardRef, useState, useMemo, useEffect, useRef } from "react";
 import type { Order, OrderItem, MenuItem, BusinessSettings } from "@/lib/supabase-queries";
 import { X } from "lucide-react";
 import { formatINR } from "@/lib/order-utils";
@@ -105,6 +105,14 @@ const TRANSLATIONS = {
   },
 };
 
+const TELUGU_RE = /[\u0C00-\u0C7F]/;
+function isTelugu(text: string) {
+  return TELUGU_RE.test(text);
+}
+
+// Feature: maximum number of item rows allowed per category box
+export const MAX_ITEMS_PER_CATEGORY = 7;
+
 function AutocompleteInput({
   value,
   onChange,
@@ -113,6 +121,7 @@ function AutocompleteInput({
   category,
   isPreviewMode,
   lang,
+  shouldFocus,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -121,8 +130,16 @@ function AutocompleteInput({
   category: string;
   isPreviewMode: boolean;
   lang: "te" | "en";
+  shouldFocus?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (shouldFocus && !isPreviewMode) {
+      inputRef.current?.focus();
+    }
+  }, [shouldFocus, isPreviewMode]);
 
   const filtered = useMemo(() => {
     const builtIn = AUTOCOMPLETE_SUGGESTIONS[category] || [];
@@ -140,18 +157,16 @@ function AutocompleteInput({
       .map((m) => m.name);
 
     const merged = Array.from(new Set([...builtIn, ...dbItems]));
-    const translated = merged.map((name) => translateItem(name, lang));
+
+    // Suggestions must match the active language only (no mixed-language lists)
+    const translated = Array.from(
+      new Set(merged.map((name) => translateItem(name, lang))),
+    ).filter((name) => (lang === "te" ? isTelugu(name) : !isTelugu(name)));
 
     if (!value) return translated.slice(0, 8);
 
-    return translated
-      .filter((name) => {
-        const teName = translateItem(name, "te").toLowerCase();
-        const enName = translateItem(name, "en").toLowerCase();
-        const q = value.toLowerCase();
-        return teName.includes(q) || enName.includes(q);
-      })
-      .slice(0, 8);
+    const q = value.toLowerCase();
+    return translated.filter((name) => name.toLowerCase().includes(q)).slice(0, 8);
   }, [menuItems, category, value, lang]);
 
   if (isPreviewMode) {
@@ -165,6 +180,7 @@ function AutocompleteInput({
   return (
     <div className="os-autocomplete-wrapper w-full h-[34px]">
       <input
+        ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => {
@@ -240,6 +256,18 @@ function ItemListBox({
     return rawItems;
   }, [items, categoryKey, isPreviewMode]);
 
+  // Auto-focus the row that was just added
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
+  const prevCount = useRef(categoryItems.length);
+  useEffect(() => {
+    if (categoryItems.length > prevCount.current) {
+      setFocusIdx(categoryItems.length - 1);
+    }
+    prevCount.current = categoryItems.length;
+  }, [categoryItems.length]);
+
+  const isFull = categoryItems.length >= MAX_ITEMS_PER_CATEGORY;
+
   return (
     <div
       className="border-[1.5px] border-[#0a7a3f] flex flex-col bg-white overflow-y-auto print:overflow-visible h-full"
@@ -253,8 +281,10 @@ function ItemListBox({
         {!isPreviewMode && (
           <button
             type="button"
-            onClick={() => onAddRow(categoryKey)}
-            className="absolute right-2 top-1.5 bg-[#0a7a3f] hover:bg-[#085a2e] text-white rounded w-6 h-6 flex items-center justify-center font-bold text-[18px] cursor-pointer"
+            disabled={isFull}
+            title={isFull ? `Maximum ${MAX_ITEMS_PER_CATEGORY} items` : "Add item"}
+            onClick={() => !isFull && onAddRow(categoryKey)}
+            className="absolute right-2 top-1.5 bg-[#0a7a3f] hover:bg-[#085a2e] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded w-6 h-6 flex items-center justify-center font-bold text-[18px] cursor-pointer"
           >
             +
           </button>
@@ -282,6 +312,7 @@ function ItemListBox({
                 category={categoryKey}
                 isPreviewMode={isPreviewMode}
                 lang={lang}
+                shouldFocus={focusIdx === idx}
               />
             </div>
             {!isPreviewMode && (
@@ -700,6 +731,7 @@ export const OrderSheet = forwardRef<HTMLDivElement, Props>(function OrderSheet(
   const handleAddItemRow = (categoryKey: string) => {
     const newItems = [...items];
     const catItems = items.filter((it) => it.category === categoryKey);
+    if (catItems.length >= MAX_ITEMS_PER_CATEGORY) return;
     newItems.push({
       name: "",
       category: categoryKey,

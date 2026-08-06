@@ -1,5 +1,7 @@
 import { buildPDF } from "./pdf-utils";
 import { nodeToPng } from "./png-utils";
+import { uploadOrderExports } from "./storage-utils";
+
 
 export class WhatsAppPhoneError extends Error {
   constructor(message: string) {
@@ -117,4 +119,55 @@ export async function shareNode(node: HTMLElement, filename: string, text: strin
   if (await tryNativeShare(file, text)) return;
 
   pdf.save(filename.endsWith(".pdf") ? filename : filename + ".pdf");
+}
+
+/**
+ * Builds the WhatsApp quotation message containing both public file links.
+ */
+export function buildQuotationMessage(
+  customerName: string | null | undefined,
+  pdfUrl: string,
+  pngUrl: string,
+): string {
+  return `Hello ${customerName?.trim() || "Customer"},
+
+Thank you for choosing Bhimas Catering.
+
+Your catering quotation is ready.
+
+📄 PDF:
+${pdfUrl}
+
+🖼 Image:
+${pngUrl}
+
+Regards,
+Bhimas Catering`;
+}
+
+/**
+ * Full sharing workflow: validate phone → generate PDF + PNG → upload to
+ * Supabase Storage → open the customer's WhatsApp chat with the message
+ * (including both public links) pre-filled.
+ */
+export async function shareOrderViaWhatsApp(
+  node: HTMLElement,
+  opts: {
+    phone?: string | null;
+    customerName?: string | null;
+    orderId?: string | null;
+    orderNumber?: number | null;
+    functionDate?: string | null;
+  },
+): Promise<{ pdfUrl: string; pngUrl: string }> {
+  const cleanPhone = normalizeIndianPhone(opts.phone);
+
+  const { pdfUrl, pngUrl } = await uploadOrderExports(node, {
+    orderId: opts.orderId ?? null,
+    orderNumber: opts.orderNumber ?? null,
+    functionDate: opts.functionDate ?? null,
+  });
+
+  openWhatsApp(cleanPhone, buildQuotationMessage(opts.customerName, pdfUrl, pngUrl));
+  return { pdfUrl, pngUrl };
 }

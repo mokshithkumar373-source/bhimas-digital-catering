@@ -10,14 +10,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchMenuItems, fetchSettings, type Order, type OrderItem } from "@/lib/supabase-queries";
 import { formatINR } from "@/lib/order-utils";
 import { translateItem, translateChecklistItem } from "@/lib/translations";
+import { shareOrderViaWhatsApp, normalizeIndianPhone } from "@/lib/share-utils";
 import {
   downloadPDF,
   downloadPNG,
   generatePDF,
   generatePNG,
   printNode,
-  whatsappPDF,
-  whatsappPNG,
   shareNode,
 } from "@/lib/export-utils";
 import {
@@ -44,6 +43,34 @@ export interface OrderEditorProps {
 
 const STATUSES = ["Pending", "Preparing", "Ready", "Delivered", "Completed", "Cancelled"];
 
+function makeEmptyOrder(): OrderDraft {
+  return {
+    status: "Pending",
+    guest_count: 0,
+    plate_rate: 0,
+    breakfast_rate: 0,
+    lunch_rate: 0,
+    dinner_rate: 0,
+    tiffin_rate: 0,
+    servers_charge: 0,
+    transport_charge: 0,
+    total: 0,
+    balance: 0,
+    advance: 0,
+    customer_name: "",
+    customer_phone: "",
+    customer_address: "",
+    function_name: "",
+    delivery_time: "",
+    remarks: "",
+    order_number: undefined,
+    customer_id: null,
+    function_date: typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : "",
+    order_details: {},
+  };
+}
+
+
 export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditorProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -62,22 +89,28 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
   });
 
   // Handoff logic for duplicating or loading offline drafts
-  const [order, setOrder] = useState<OrderDraft>(() => {
-    return (
-      initialOrder ?? {
-        status: "Pending",
-        guest_count: 0,
-        plate_rate: 0,
-        advance: 0,
-        function_date: typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : "",
-        order_details: {},
-      }
-    );
-  });
+  const [order, setOrder] = useState<OrderDraft>(() => initialOrder ?? makeEmptyOrder());
 
   const [items, setItems] = useState<OrderItem[]>(() => {
     return initialItems ?? [];
   });
+
+  // Full form reset — behaves exactly like opening the app for the first time
+  const skipResetRef = useRef(false);
+  const whatsappBusyRef = useRef(false);
+  const savedOrderNumberRef = useRef<number | null>(null);
+
+  const resetForm = () => {
+    setOrder(makeEmptyOrder());
+    setItems([]);
+    setIsDirty(false);
+    setIsPreviewMode(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("bhimas_order_draft_new");
+      sessionStorage.removeItem("bhimas_duplicate_draft");
+    }
+  };
+
 
   // Client-side initialization after mount (SSR Safety)
   useEffect(() => {
@@ -274,10 +307,11 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
         const { data, error } = await supabase
           .from("orders")
           .insert({ ...payload, customer_id: customerId })
-          .select("id")
+          .select("id, order_number")
           .single();
         if (error) throw error;
         savedId = data.id;
+        savedOrderNumberRef.current = data.order_number ?? null;
       }
 
       // Filter active items (remove empty rows)
@@ -306,8 +340,10 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
       toast.success("Order saved successfully");
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order", id] });
-      if (!orderId) {
-        navigate({ to: "/orders/$id", params: { id } });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+      // New orders: clear the form so the next order starts completely fresh
+      if (!orderId && !skipResetRef.current) {
+        resetForm();
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -410,45 +446,48 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
     return `Bhimas Catering — Order details:\nOrder No: #${order.order_number || "Draft"}\nCustomer: ${order.customer_name || ""}\nFunction: ${order.function_name || ""}\nDate: ${order.function_date || ""}\nTotal Amount: ${formatINR(totals.total)}\nAdvance paid: ${formatINR(order.advance || 0)}\nBalance: ${formatINR(totals.balance)}`;
   };
 
-  const doWhatsAppPDF = async () => {
+  // Save -> generate PDF + PNG -> upload to cloud storage -> open WhatsApp with links
+  const doWhatsAppShare = async () => {
     if (!sheetRef.current) {
       toast.error("Error: Order sheet HTML element not found");
       return;
     }
-    const tId = toast.loading("Preparing PDF for WhatsApp...");
+    if (whatsappBusyRef.current) return;
+    whatsappBusyRef.current = true;
+
+    const tId = toast.loading("Saving order...");
     try {
-      await whatsappPDF(
-        sheetRef.current,
-        pdfFilename,
-        getWhatsAppText(),
-        order.customer_phone ?? undefined,
-      );
-      toast.success("WhatsApp shared link opened", { id: tId });
+      normalizeIndianPhone(order.customer_phone ?? undefined);
+
+      let savedId = orderId ?? null;
+      skipResetRef.current = true;
+      if (!orderId || isDirty) {
+        savedId = await saveMutation.mutateAsync();
+      }
+
+      toast.loading("Generating and uploading files...", { id: tId });
+      await shareOrderViaWhatsApp(sheetRef.current, {
+        phone: order.customer_phone,
+        customerName: order.customer_name,
+        orderId: savedId,
+        orderNumber: order.order_number ?? savedOrderNumberRef.current,
+        functionDate: order.function_date ?? null,
+      });
+
+      toast.success("WhatsApp opened with the quotation links", { id: tId });
+      if (!orderId) resetForm();
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || String(e), { id: tId });
+    } finally {
+      skipResetRef.current = false;
+      whatsappBusyRef.current = false;
     }
   };
 
-  const doWhatsAppPNG = async () => {
-    if (!sheetRef.current) {
-      toast.error("Error: Order sheet HTML element not found");
-      return;
-    }
-    const tId = toast.loading("Preparing PNG for WhatsApp...");
-    try {
-      await whatsappPNG(
-        sheetRef.current,
-        pdfFilename,
-        getWhatsAppText(),
-        order.customer_phone ?? undefined,
-      );
-      toast.success("WhatsApp shared link opened", { id: tId });
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message || String(e), { id: tId });
-    }
-  };
+  const doWhatsAppPDF = doWhatsAppShare;
+
+  const doWhatsAppPNG = doWhatsAppShare;
 
   const doShare = async () => {
     if (!sheetRef.current) {

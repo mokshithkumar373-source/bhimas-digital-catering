@@ -1,24 +1,20 @@
-import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
-
-const EXPORT_OPTIONS = {
-  pixelRatio: 3,
-  backgroundColor: "#ffffff",
-  cacheBust: true,
-  skipFonts: true,
-};
+import { captureNodePng } from "./capture-utils";
 
 /**
- * Generates a jsPDF instance by rendering the node to a PNG and scaling it to A4.
+ * Generates a jsPDF instance by rendering the node to a high-resolution PNG
+ * (A4 @ ~300 DPI) and scaling it to an A4 portrait page.
  */
 export async function buildPDF(node: HTMLElement): Promise<jsPDF> {
-  const dataUrl = await toPng(node, EXPORT_OPTIONS);
+  const dataUrl = await captureNodePng(node);
 
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
+    compress: true,
   });
+
 
   const pageW = 210;
   const pageH = 297;
