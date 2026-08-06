@@ -107,6 +107,44 @@ export type Database = {
         }
         Relationships: []
       }
+      order_files: {
+        Row: {
+          file_name: string
+          file_type: string
+          id: string
+          order_id: string | null
+          public_url: string | null
+          storage_path: string
+          uploaded_at: string
+        }
+        Insert: {
+          file_name: string
+          file_type: string
+          id?: string
+          order_id?: string | null
+          public_url?: string | null
+          storage_path: string
+          uploaded_at?: string
+        }
+        Update: {
+          file_name?: string
+          file_type?: string
+          id?: string
+          order_id?: string | null
+          public_url?: string | null
+          storage_path?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_files_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           category: string
