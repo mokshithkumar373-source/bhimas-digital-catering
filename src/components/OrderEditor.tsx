@@ -17,8 +17,6 @@ import {
   generatePDF,
   generatePNG,
   printNode,
-  whatsappPDF,
-  whatsappPNG,
   shareNode,
 } from "@/lib/export-utils";
 import {
@@ -487,25 +485,7 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
 
   const doWhatsAppPDF = doWhatsAppShare;
 
-  const doWhatsAppPNG = async () => {
-    if (!sheetRef.current) {
-      toast.error("Error: Order sheet HTML element not found");
-      return;
-    }
-    const tId = toast.loading("Preparing PNG for WhatsApp...");
-    try {
-      await whatsappPNG(
-        sheetRef.current,
-        pdfFilename,
-        getWhatsAppText(),
-        order.customer_phone ?? undefined,
-      );
-      toast.success("WhatsApp shared link opened", { id: tId });
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e?.message || String(e), { id: tId });
-    }
-  };
+  const doWhatsAppPNG = doWhatsAppShare;
 
   const doShare = async () => {
     if (!sheetRef.current) {
