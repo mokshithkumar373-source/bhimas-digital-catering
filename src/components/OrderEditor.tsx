@@ -98,6 +98,7 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
   // Full form reset — behaves exactly like opening the app for the first time
   const skipResetRef = useRef(false);
   const whatsappBusyRef = useRef(false);
+  const savedOrderNumberRef = useRef<number | null>(null);
 
   const resetForm = () => {
     setOrder(makeEmptyOrder());
@@ -306,10 +307,11 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
         const { data, error } = await supabase
           .from("orders")
           .insert({ ...payload, customer_id: customerId })
-          .select("id")
+          .select("id, order_number")
           .single();
         if (error) throw error;
         savedId = data.id;
+        savedOrderNumberRef.current = data.order_number ?? null;
       }
 
       // Filter active items (remove empty rows)
@@ -468,7 +470,7 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
         phone: order.customer_phone,
         customerName: order.customer_name,
         orderId: savedId,
-        orderNumber: order.order_number ?? null,
+        orderNumber: order.order_number ?? savedOrderNumberRef.current,
         functionDate: order.function_date ?? null,
       });
 
