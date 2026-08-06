@@ -44,6 +44,34 @@ export interface OrderEditorProps {
 
 const STATUSES = ["Pending", "Preparing", "Ready", "Delivered", "Completed", "Cancelled"];
 
+function makeEmptyOrder(): OrderDraft {
+  return {
+    status: "Pending",
+    guest_count: 0,
+    plate_rate: 0,
+    breakfast_rate: 0,
+    lunch_rate: 0,
+    dinner_rate: 0,
+    tiffin_rate: 0,
+    servers_charge: 0,
+    transport_charge: 0,
+    total: 0,
+    balance: 0,
+    advance: 0,
+    customer_name: "",
+    customer_phone: "",
+    customer_address: "",
+    function_name: "",
+    delivery_time: "",
+    remarks: "",
+    order_number: undefined,
+    customer_id: null,
+    function_date: typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : "",
+    order_details: {},
+  };
+}
+
+
 export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditorProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -62,22 +90,24 @@ export function OrderEditor({ initialOrder, initialItems, orderId }: OrderEditor
   });
 
   // Handoff logic for duplicating or loading offline drafts
-  const [order, setOrder] = useState<OrderDraft>(() => {
-    return (
-      initialOrder ?? {
-        status: "Pending",
-        guest_count: 0,
-        plate_rate: 0,
-        advance: 0,
-        function_date: typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : "",
-        order_details: {},
-      }
-    );
-  });
+  const [order, setOrder] = useState<OrderDraft>(() => initialOrder ?? makeEmptyOrder());
 
   const [items, setItems] = useState<OrderItem[]>(() => {
     return initialItems ?? [];
   });
+
+  // Full form reset — behaves exactly like opening the app for the first time
+  const resetForm = () => {
+    setOrder(makeEmptyOrder());
+    setItems([]);
+    setIsDirty(false);
+    setIsPreviewMode(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("bhimas_order_draft_new");
+      sessionStorage.removeItem("bhimas_duplicate_draft");
+    }
+  };
+
 
   // Client-side initialization after mount (SSR Safety)
   useEffect(() => {
