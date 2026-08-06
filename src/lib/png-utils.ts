@@ -1,17 +1,10 @@
-import { toPng } from "html-to-image";
-
-const EXPORT_OPTIONS = {
-  pixelRatio: 3,
-  backgroundColor: "#ffffff",
-  cacheBust: true,
-  skipFonts: true,
-};
+import { captureNodePng } from "./capture-utils";
 
 /**
- * Helper to generate a high-resolution PNG data URL from a DOM node.
+ * Helper to generate a high-resolution (A4 @ ~300 DPI) PNG data URL from a DOM node.
  */
 export async function nodeToPng(node: HTMLElement): Promise<string> {
-  return await toPng(node, EXPORT_OPTIONS);
+  return await captureNodePng(node);
 }
 
 /**
@@ -34,7 +27,7 @@ export async function generatePNG(node: HTMLElement): Promise<void> {
     throw new Error("Popup blocker enabled! Please allow popups for this site.");
   }
   w.document.write("Loading PNG preview...");
-  
+
   try {
     const url = await nodeToPng(node);
     w.document.body.innerHTML = "";
