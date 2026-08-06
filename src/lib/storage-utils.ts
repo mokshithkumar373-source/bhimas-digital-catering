@@ -74,8 +74,7 @@ export async function uploadOrderExports(
     ]);
 
     if (opts.orderId) {
-      await supabase.from("order_files").upsert(
-        [
+      await supabase.from("order_files").insert([
           {
             order_id: opts.orderId,
             file_name: `${baseName}.pdf`,
@@ -90,9 +89,7 @@ export async function uploadOrderExports(
             storage_path: pngPath,
             public_url: pngUrl,
           },
-        ],
-        { onConflict: "storage_path", ignoreDuplicates: false },
-      );
+      ]);
     }
 
     return { pdfUrl, pngUrl, baseName };
