@@ -15,22 +15,21 @@ import { AppLayout } from "../components/AppLayout";
 
 function NotFoundComponent() {
   return (
-    <AppLayout>
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-6xl font-bold text-brand">404</h1>
-          <p className="mt-2 text-muted-foreground">Page not found</p>
-          <Link
-            to="/"
-            className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground"
-          >
-            Back to Dashboard
-          </Link>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold text-brand">404</h1>
+        <p className="mt-2 text-muted-foreground">Page not found</p>
+        <Link
+          to="/"
+          className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground"
+        >
+          Back to Home
+        </Link>
       </div>
-    </AppLayout>
+    </div>
   );
 }
+
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
