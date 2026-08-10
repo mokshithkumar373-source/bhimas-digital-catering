@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { OrderEditor } from "@/components/OrderEditor";
 import { fetchOrder } from "@/lib/supabase-queries";
 
-export const Route = createFileRoute("/orders/$id")({
+export const Route = createFileRoute("/_authenticated/orders/$id")({
   component: OrderDetail,
 });
 

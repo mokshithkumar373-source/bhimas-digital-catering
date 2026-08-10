@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Search, PlusCircle } from "lucide-react";
 
-export const Route = createFileRoute("/orders/")({
+export const Route = createFileRoute("/_authenticated/orders/")({
   component: OrdersList,
 });
 

@@ -6,7 +6,7 @@ import { formatINR } from "@/lib/order-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/reports")({
+export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
 });
 
